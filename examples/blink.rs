@@ -28,7 +28,7 @@ app! {
         static ON: bool = false;
     },
     tasks: {
-        SYS_TICK: {
+        SysTick: {
             path: sys_tick,
             resources: [ON],
         },
@@ -43,8 +43,8 @@ fn init(mut p: init::Peripherals, r: init::Resources) {
 
     p.device.GPIOA.moder.modify(|_, w| unsafe{ w.mode5().bits(1) });
 
-    // gpioa.odr.modify(|_, w| w.od5().set_bit());
-
+    // p.device.GPIOA.odr.modify(|_, w| w.od5().set_bit());
+    
     p.core.SYST.set_clock_source(SystClkSource::Core);
     p.core.SYST.set_reload(2_000_000); // 1s
     p.core.SYST.clear_current();
@@ -59,7 +59,7 @@ fn idle() -> ! {
 }
 
 #[allow(unsafe_code)]
-fn sys_tick(_t: &mut Threshold, mut r: SYS_TICK::Resources) {
+fn sys_tick(_t: &mut Threshold, mut r: SysTick::Resources) {
     // toggle state
     *r.ON = !*r.ON;
 
