@@ -1,0 +1,11 @@
+[target.thumbv6m-none-eabi]
+runner = "arm-none-eabi-gdb"
+rustflags = [
+  #"-C", "linker=rust-lld",
+  #"-C", "link-arg=-Tlink.x",
+  "-C", "link-arg=-Tlink.x",
+
+]
+
+[build]
+target = "thumbv6m-none-eabi"
