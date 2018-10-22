@@ -6,17 +6,20 @@ authors = ["Cecília Carneiro <cecilia.carneiroesilva@gmail.com>"]
 
 [dependencies]
 
-cortex-m = "0.5.7"
-#cortex-m-rt = {version = "0.6.3", features = ["device"]} #feature device
+#cortex-m = "0.5.7"
 
-#cortex-m = { path = "../cortex-m", version = "0.5.7" }
+cortex-m = { path = "../cortex-m", version = "0.5.7" } # com esse da duplicacao
 cortex-m-rt = {version = "0.6.4", features = ["device"]} #feature device
+
+cortex-m-rtfm = { path = "../cortex-m-rtfm" }
+#cortex-m-rtfm = { git = "https://github.com/ykomatsu/cortex-m-rtfm", branch = "update" }
+
 
 #cortex-m-semihosting = "0.3.1"
 
-[dependencies.stm32l0]
-version = "0.2.3"
-features = ["stm32l0x1", "rt"]
+#[dependencies.stm32l0]
+#version = "0.2.3"
+#features = ["stm32l0x1", "rt"]
 
 [dependencies.stm32l052]
 version = "0.1.0"
