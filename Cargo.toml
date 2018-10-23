@@ -5,14 +5,9 @@ authors = ["Cecília Carneiro <cecilia.carneiroesilva@gmail.com>"]
 
 
 [dependencies]
-
-#cortex-m = "0.5.7"
-
-cortex-m = { path = "../cortex-m", version = "0.5.7" } # com esse da duplicacao
+cortex-m = { git = "https://github.com/ceciliacsilva/cortex-m", version = "0.5.7" }
 cortex-m-rt = {version = "0.6.4", features = ["device"]} #feature device
-
-cortex-m-rtfm = { path = "../cortex-m-rtfm" }
-#cortex-m-rtfm = { git = "https://github.com/ykomatsu/cortex-m-rtfm", branch = "update" }
+cortex-m-rtfm = { git = "https://github.com/ceciliacsilva/cortex-m-rtfm" }
 
 
 #cortex-m-semihosting = "0.3.1"
@@ -23,5 +18,6 @@ cortex-m-rtfm = { path = "../cortex-m-rtfm" }
 
 [dependencies.stm32l052]
 version = "0.1.0"
-path = "../../stm32l052"
+#path = "../../stm32l052"
+git = "https://github.com/ceciliacsilva/stm32l052"
 features = ["rt"]

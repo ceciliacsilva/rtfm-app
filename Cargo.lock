@@ -42,19 +42,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "cortex-m"
 version = "0.5.7"
+source = "git+https://github.com/ceciliacsilva/cortex-m#332ef245b1de09de03f8e93e58da526be5fb35b2"
 dependencies = [
  "aligned 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "bare-metal 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "volatile-register 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "cortex-m-rt"
-version = "0.5.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "cortex-m-rt 0.6.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "r0 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -80,10 +72,11 @@ dependencies = [
 [[package]]
 name = "cortex-m-rtfm"
 version = "0.3.4"
+source = "git+https://github.com/ceciliacsilva/cortex-m-rtfm#ad571292dfbbfbc1d2b587eef148794076d59133"
 dependencies = [
- "cortex-m 0.5.7",
+ "cortex-m 0.5.7 (git+https://github.com/ceciliacsilva/cortex-m)",
  "cortex-m-rt 0.6.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "cortex-m-rtfm-macros 0.3.2",
+ "cortex-m-rtfm-macros 0.3.2 (git+https://github.com/ceciliacsilva/cortex-m-rtfm)",
  "rtfm-core 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "untagged-option 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -91,6 +84,7 @@ dependencies = [
 [[package]]
 name = "cortex-m-rtfm-macros"
 version = "0.3.2"
+source = "git+https://github.com/ceciliacsilva/cortex-m-rtfm#ad571292dfbbfbc1d2b587eef148794076d59133"
 dependencies = [
  "failure 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "proc-macro2 0.4.20 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -175,10 +169,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "rtfm-app"
 version = "0.1.0"
 dependencies = [
- "cortex-m 0.5.7",
+ "cortex-m 0.5.7 (git+https://github.com/ceciliacsilva/cortex-m)",
  "cortex-m-rt 0.6.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "cortex-m-rtfm 0.3.4",
- "stm32l052 0.1.0",
+ "cortex-m-rtfm 0.3.4 (git+https://github.com/ceciliacsilva/cortex-m-rtfm)",
+ "stm32l052 0.1.0 (git+https://github.com/ceciliacsilva/stm32l052)",
 ]
 
 [[package]]
@@ -206,10 +200,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "stm32l052"
 version = "0.1.0"
+source = "git+https://github.com/ceciliacsilva/stm32l052#a5155c23b81a5db5862562f94eb30976930dc88a"
 dependencies = [
  "bare-metal 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "cortex-m 0.5.7",
- "cortex-m-rt 0.5.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cortex-m 0.5.7 (git+https://github.com/ceciliacsilva/cortex-m)",
+ "cortex-m-rt 0.6.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "vcell 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -293,9 +288,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum bare-metal 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "1bdcf9294ed648c7cd29b11db06ea244005aeef50ae8f605b1a3af2940bf8f92"
 "checksum cc 1.0.25 (registry+https://github.com/rust-lang/crates.io-index)" = "f159dfd43363c4d08055a07703eb7a3406b0dac4d0584d96965a3262db3c9d16"
 "checksum cfg-if 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)" = "082bb9b28e00d3c9d39cc03e64ce4cea0f1bb9b3fde493f0cbc008472d22bdf4"
-"checksum cortex-m-rt 0.5.7 (registry+https://github.com/rust-lang/crates.io-index)" = "09fd585ab79330179866e2fdb18ad1083dada4244a72df81ecf63f012aa4f86f"
+"checksum cortex-m 0.5.7 (git+https://github.com/ceciliacsilva/cortex-m)" = "<none>"
 "checksum cortex-m-rt 0.6.4 (registry+https://github.com/rust-lang/crates.io-index)" = "d86cfa89fa220d3cb7a41133693e2d302d18e9a632298ffb3738f175c8c12325"
 "checksum cortex-m-rt-macros 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "3139fdadccaa0db6fa96637678ced9b0b97e4f10047c9ab603d125048e107d1a"
+"checksum cortex-m-rtfm 0.3.4 (git+https://github.com/ceciliacsilva/cortex-m-rtfm)" = "<none>"
+"checksum cortex-m-rtfm-macros 0.3.2 (git+https://github.com/ceciliacsilva/cortex-m-rtfm)" = "<none>"
 "checksum either 1.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3be565ca5c557d7f59e7cfcf1844f9e3033650c929c6566f511e8005f205c1d0"
 "checksum failure 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)" = "6dd377bcc1b1b7ce911967e3ec24fa19c3224394ec05b54aa7b083d498341ac7"
 "checksum failure_derive 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)" = "64c2d913fe8ed3b6c6518eedf4538255b989945c14c2a7d5cbff62a5e2120596"
@@ -309,6 +306,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum rtfm-core 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "11ba440da895db782b3e459c39316133e36ee13c60a836bb99f7df4940beb441"
 "checksum rtfm-syntax 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)" = "820448648d3adb35aadaeaccf8536eae97008ca47f36078a0791878402cae6bd"
 "checksum rustc-demangle 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)" = "bcfe5b13211b4d78e5c2cadfebd7769197d95c639c35a50057eb4c05de811395"
+"checksum stm32l052 0.1.0 (git+https://github.com/ceciliacsilva/stm32l052)" = "<none>"
 "checksum syn 0.14.9 (registry+https://github.com/rust-lang/crates.io-index)" = "261ae9ecaa397c42b960649561949d69311f08eeaea86a65696e6e46517cf741"
 "checksum syn 0.15.13 (registry+https://github.com/rust-lang/crates.io-index)" = "7b4439ee8325b4e4b57e59309c3724c9a4478eaeb4eb094b6f3fac180a3b2876"
 "checksum synstructure 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ec37f4fab4bafaf6b5621c1d54e6aa5d4d059a8f84929e87abfdd7f9f04c6db2"
