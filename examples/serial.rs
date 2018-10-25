@@ -10,6 +10,11 @@ extern crate hal;
 extern crate embedded_hal;
 extern crate cortex_m_semihosting as sh;
 
+extern crate heapless;
+
+use heapless::Vec; // fixed capacity `std::Vec`
+use heapless::consts::U8; // type level integer used to specify capacity
+
 use core::panic::PanicInfo;
 use core::sync::atomic::{self, Ordering};
 
@@ -38,48 +43,24 @@ use hal::gpio::{Output, PushPull, gpioa::PA5};
 use core::fmt::Write;
 use sh::hio;
 
-pub struct ToSave{
-    data: u8,
-}
-
-// pub trait Pegar {
-//     fn pegar (self) -> u8;
-// }
-
-impl ToSave {
-    fn new (data: u8) -> Self {
-        ToSave{
-            data: data,
-        }
-    }
-    fn pegar (&mut self) -> u8 {
-        self.data
-    }
-}
-
-// impl Pegar for ToSave {
-//     fn pegar (self) -> u8 {
-//         self.data
-//     }
-// }
-
 app! {
     device: stm32l0::stm32l0x1,
     resources: {
         // static ON: bool = false;
         // static BUFFER: [[u8; 8]; 2] = [[0; 8]; 2];
         // static CB: CircBuffer<[u8; 8], dma1::C4>;
-        static DATA: u8 = 0;
+        static END: bool = false;
+        static VEC_DATA: Vec<u8, U8> = Vec::new();
         static RX: Rx<USART2_p>;
         static LED: PA5<Output<PushPull>>;
     },
     idle: {
-        resources: [DATA, LED],
+        resources: [LED, VEC_DATA, END],
     },
     tasks: {
         USART2: {
             path: rx,
-            resources: [DATA, RX],
+            resources: [RX, VEC_DATA, END],
         }
     }
 }
@@ -134,16 +115,31 @@ fn init(mut p: init::Peripherals, r: init::Resources) -> init::LateResources {
     }
 }
 
-fn idle(t: &mut Threshold, r: idle::Resources) -> ! {
+fn idle(t: &mut Threshold, mut r: idle::Resources) -> ! {
     
     let mut hstdout = hio::hstdout().unwrap();
+
+    // let mut xs: Vec<u8, U8> = Vec::new(); // can hold up to 8 elements
+    // r.VEC_DATA.push(42).unwrap();
+
 
     loop {
         rtfm::wfi();
 
         r.LED.set_high();
 
-        r.DATA.claim(t, |data, _| writeln!(hstdout,"uart data: {}", *data).unwrap() );
+        let end = r.END.claim_mut(t, |end, _| {
+            if *end{
+                *end != *end;
+            }
+            *end
+        });
+
+        if !end {
+            r.LED.set_low();
+            writeln!(hstdout,"end").unwrap()
+            // r.VEC_DATA.claim(t, |data, _| writeln!(hstdout,"uart data: {:?}", data).unwrap());
+        }
 
         // let data = *r.DATA;
         // let data = r.DATA.data;
@@ -166,7 +162,12 @@ fn rx(_t: &mut Threshold, mut r: USART2::Resources) {
 
     let a = r.RX.read().unwrap();
 
-    *r.DATA = a;
+    if a == 0x10 {
+        *r.END = true;
+    } else {
+        r.VEC_DATA.push(a).unwrap();
+    }
+
 
     // bkpt();
 }
