@@ -271,6 +271,7 @@ dependencies = [
  "embedded-hal 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "hal 0.1.0",
  "heapless 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "nb 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "stm32l052 0.1.0 (git+https://github.com/ceciliacsilva/stm32l052)",
 ]
 
