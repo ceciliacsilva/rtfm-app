@@ -15,6 +15,8 @@ extern crate heapless;
 use heapless::Vec; // fixed capacity `std::Vec`
 use heapless::consts::U8; // type level integer used to specify capacity
 
+use heapless::spsc;
+
 use core::panic::PanicInfo;
 use core::sync::atomic::{self, Ordering};
 
@@ -51,16 +53,17 @@ app! {
         // static CB: CircBuffer<[u8; 8], dma1::C4>;
         static END: bool = false;
         static VEC_DATA: Vec<u8, U8> = Vec::new();
+        static RB: spsc::Queue<u8, U8> = spsc::Queue::new();
         static RX: Rx<USART2_p>;
         static LED: PA5<Output<PushPull>>;
     },
     idle: {
-        resources: [LED, VEC_DATA, END],
+        resources: [LED, VEC_DATA, END, RB],
     },
     tasks: {
         USART2: {
             path: rx,
-            resources: [RX, VEC_DATA, END],
+            resources: [RX, VEC_DATA, END, RB],
         }
     }
 }
@@ -124,7 +127,7 @@ fn idle(t: &mut Threshold, mut r: idle::Resources) -> ! {
 
 
     loop {
-        rtfm::wfi();
+        // rtfm::wfi();
 
         r.LED.set_high();
 
@@ -137,8 +140,8 @@ fn idle(t: &mut Threshold, mut r: idle::Resources) -> ! {
 
         if !end {
             r.LED.set_low();
-            writeln!(hstdout,"end").unwrap()
-            // r.VEC_DATA.claim(t, |data, _| writeln!(hstdout,"uart data: {:?}", data).unwrap());
+            writeln!(hstdout,"end").unwrap();
+            let a = r.RB.claim_mut(t, |rb, _| rb.dequeue());
         }
 
         // let data = *r.DATA;
@@ -166,6 +169,7 @@ fn rx(_t: &mut Threshold, mut r: USART2::Resources) {
         *r.END = true;
     } else {
         r.VEC_DATA.push(a).unwrap();
+        r.RB.enqueue(a);
     }
 
 
