@@ -31,8 +31,8 @@ use hal::flash::FlashExt;
 use hal::serial::Serial;
 use hal::serial::{Rx, Event, Tx};
 use hal::time::U32Ext;
-use hal::stm32l0;
-use hal::stm32l0::stm32l0x1::USART2 as USART2_p;
+use hal::stm32l052;
+use hal::stm32l052::USART2 as USART2_p;
 
 use hal::gpio::{Output, PushPull, gpioa::PA5};
 
@@ -46,7 +46,7 @@ enum Command {
 }
 
 app! {
-    device: stm32l0::stm32l0x1,
+    device: stm32l052,
     resources: {
         static END: bool = false;
         static RB: spsc::Queue<u8, U20> = spsc::Queue::new();

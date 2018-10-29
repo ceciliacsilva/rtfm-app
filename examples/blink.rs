@@ -5,8 +5,7 @@
 extern crate cortex_m;
 extern crate cortex_m_rt;
 extern crate cortex_m_rtfm as rtfm;
-// extern crate stm32l0;
-extern crate stm32l052;
+extern crate hal;
 
 use core::panic::PanicInfo;
 use core::sync::atomic::{self, Ordering};
@@ -16,10 +15,8 @@ use cortex_m::peripheral::syst::SystClkSource;
 
 use rtfm::{app, Threshold};
 
-// use stm32l0::stm32l0x1;
-// use stm32l0x1::GPIOA;
-
-use stm32l052::GPIOA;
+use hal::stm32l052;
+use hal::stm32l052::GPIOA;
 
 app! {
     // device: stm32l0x1,

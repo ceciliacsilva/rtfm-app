@@ -23,13 +23,13 @@ use hal::gpio::GpioExt;
 // use hal::serial::Serial;
 // use hal::serial::{Rx, Event, Tx};
 // use hal::time::U32Ext;
-use hal::stm32l0;
+use hal::stm32l052;
 // use hal::stm32l0::stm32l0x1::USART2 as USART2_p;
 
 use hal::gpio::{Output, Input, PushPull, PullUp, gpioa::PA5, gpioa::PA4};
 
 app! {
-    device: stm32l0::stm32l0x1,
+    device: stm32l052,
     resources: {
         static LED: PA5<Output<PushPull>>;
         static BUTTON: PA4<Input<PullUp>>;
