@@ -59,9 +59,10 @@ app! {
     },
     tasks: {
         USART2: {
+            priority: 2,
             path: receive_callback,
             resources: [RX, END, RB],
-        }
+        },
     }
 }
 
@@ -72,6 +73,7 @@ fn init(mut p: init::Peripherals, _r: init::Resources) -> init::LateResources {
     let clocks = rcc.cfgr.freeze(&mut flash.acr);
 
     let led = gpioa.pa5.into_output(&mut gpioa.moder).push_pull(&mut gpioa.otyper);
+    let _but = gpioa.pa4.into_input(&mut gpioa.moder).pull_up(&mut gpioa.pupdr);
 
     let tx = gpioa.pa2.into_alternate(&mut gpioa.moder).af4(&mut gpioa.afrl);
     let rx = gpioa.pa3.into_alternate(&mut gpioa.moder).af4(&mut gpioa.afrl);
