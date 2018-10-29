@@ -13,7 +13,7 @@ extern crate heapless;
 extern crate nb;
 
 use heapless::Vec; 
-use heapless::spsc;
+use heapless::{spsc, spsc::Consumer, spsc::Producer};
 use heapless::consts::U20; 
 
 use core::panic::PanicInfo;
@@ -66,7 +66,7 @@ app! {
     }
 }
 
-fn init(mut p: init::Peripherals, _r: init::Resources) -> init::LateResources {
+fn init(mut p: init::Peripherals, r: init::Resources) -> init::LateResources {
     let mut rcc = p.device.RCC.constrain();
     let mut flash = p.device.FLASH.constrain();
     let mut gpioa = p.device.GPIOA.split(&mut rcc.iop);
@@ -151,8 +151,7 @@ fn receive_callback(_t: &mut Threshold, mut r: USART2::Resources) {
         *r.END = true;
     } 
     
-    let mut producer = unsafe { r.RB.split().0 };
-    producer.enqueue(data);
+    r.RB.enqueue(data);
 }
 
 
