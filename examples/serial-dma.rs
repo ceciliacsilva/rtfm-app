@@ -100,7 +100,7 @@ fn init(mut p: init::Peripherals, r: init::Resources) -> init::LateResources {
     let sent = b'X';
     block!(tx.write(sent)).ok();
 
-    let buf = singleton!(: [[u8; 8]; 2] = [[0; 8]; 2]).unwrap();
+    let buf = singleton!(: [[u8; 8]; 1] = [[0; 8]; 1]).unwrap();
     let cb = rx.circ_buf(channels.5, buf);
 
     init::LateResources {
@@ -120,7 +120,11 @@ fn idle(mut t: &mut Threshold, mut r: idle::Resources) -> ! {
             r.LED.set_low();
         }
         
-        let buf = r.CB.partial_peek(|half, _| Ok( (0, half) )).unwrap();
+        let (buf1, buf2) = r.CB.partial_peek();
+
+        for (i, e) in buf1.iter().chain(buf2.iter()).enumerate(){
+            block!(r.TX.write(*e));
+        }
 
         r.END.claim_mut(&mut t, |end, _| *end = false);
     //     if r.END.claim(&mut t, |end, _| *end) {
