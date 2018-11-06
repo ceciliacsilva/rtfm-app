@@ -33,6 +33,7 @@ use hal::serial::Serial;
 use hal::serial::{Rx, Event, Tx};
 use hal::time::U32Ext;
 use hal::dma::DmaExt;
+use hal::dma::CircBuffer;
 use hal::dma::dma1;
 use hal::stm32l052;
 use hal::stm32l052::USART2 as USART2_p;
@@ -55,10 +56,10 @@ app! {
         static END: bool = false;
         static TX: Tx<USART2_p>;
         static LED: PA5<Output<PushPull>>;
-        static T: hal::dma::Transfer<hal::dma::W, &'static mut [u8; 8], hal::dma::dma1::C5, hal::serial::Rx<hal::stm32l052::USART2>>;
+        static CB: CircBuffer<[u8; 8], dma1::C5>;
     },
     idle: {
-        resources: [LED, END, TX, T],
+        resources: [LED, END, TX, CB],
     },
     tasks: {
         USART2: {
@@ -99,13 +100,13 @@ fn init(mut p: init::Peripherals, r: init::Resources) -> init::LateResources {
     let sent = b'X';
     block!(tx.write(sent)).ok();
 
-    let buf = singleton!(: [u8; 8] = [0; 8]).unwrap();
-    let t = rx.read_exact(channels.5, buf);
+    let buf = singleton!(: [[u8; 8]; 2] = [[0; 8]; 2]).unwrap();
+    let cb = rx.circ_buf(channels.5, buf);
 
     init::LateResources {
         LED: led,
         TX: tx,
-        T: t,
+        CB: cb,
     }
 }
 
@@ -119,18 +120,7 @@ fn idle(mut t: &mut Threshold, mut r: idle::Resources) -> ! {
             r.LED.set_low();
         }
         
-        r.T.stop();
-
-        let mut buffer: Vec<u8, U8> = Vec::new();
-        {
-            let buf = r.T.peek();
-
-            for i in buf {
-                buffer.push(*i);
-            }
-        }
-
-        r.T.restart();
+        let buf = r.CB.partial_peek(|half, _| Ok( (0, half) )).unwrap();
 
         r.END.claim_mut(&mut t, |end, _| *end = false);
     //     if r.END.claim(&mut t, |end, _| *end) {
