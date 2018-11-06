@@ -33,7 +33,7 @@ use hal::serial::Serial;
 use hal::serial::{Rx, Event, Tx};
 use hal::time::U32Ext;
 use hal::dma::DmaExt;
-use hal::dma::CircBuffer;
+use hal::dma::CircBufferLinear;
 use hal::dma::dma1;
 use hal::stm32l052;
 use hal::stm32l052::USART2 as USART2_p;
@@ -56,7 +56,7 @@ app! {
         static END: bool = false;
         static TX: Tx<USART2_p>;
         static LED: PA5<Output<PushPull>>;
-        static CB: CircBuffer<[u8; 8], dma1::C5>;
+        static CB: CircBufferLinear<[u8; 8], dma1::C5>;
     },
     idle: {
         resources: [LED, END, TX, CB],
@@ -95,13 +95,8 @@ fn init(mut p: init::Peripherals, r: init::Resources) -> init::LateResources {
 
     let (mut tx, mut rx) = serial.split();
 
-    led.set_high();
-
-    let sent = b'X';
-    block!(tx.write(sent)).ok();
-
     let buf = singleton!(: [[u8; 8]; 1] = [[0; 8]; 1]).unwrap();
-    let cb = rx.circ_buf(channels.5, buf);
+    let cb = rx.circ_buf_linear(channels.5, buf);
 
     init::LateResources {
         LED: led,
@@ -117,16 +112,38 @@ fn idle(mut t: &mut Threshold, mut r: idle::Resources) -> ! {
         // bkpt();
 
         if r.END.claim(&mut t, |end, _| *end) {
-            r.LED.set_low();
+            let (buf1, buf2) = r.CB.partial_peek();
+
+            let mut vec: Vec<u8, U8> = Vec::new();
+
+            for e in buf1.iter().chain(buf2.iter()){
+                if *e != b' ' && *e != b'a' {
+                    vec.push(*e);
+                }
+            }
+
+            for v in &vec[..] {
+                block!(r.TX.write(*v)).ok();
+            }
+
+            let op = vec.get(4);
+
+            let command =
+                match op {
+                    Some(78) | Some (110) => Command::Enable,
+                    Some(70) | Some (102) => Command::Disable,
+                    _ => Command::Nothing,
+                };
+            
+            match command {
+                Command::Enable => r.LED.set_high(),
+                Command::Disable => r.LED.set_low(),
+                _ => (),
+            }
         }
         
-        let (buf1, buf2) = r.CB.partial_peek();
-
-        for (i, e) in buf1.iter().chain(buf2.iter()).enumerate(){
-            block!(r.TX.write(*e));
-        }
-
         r.END.claim_mut(&mut t, |end, _| *end = false);
+        
     //     if r.END.claim(&mut t, |end, _| *end) {
     //         let mut vec: Vec<u8, U20> = Vec::new();
 
