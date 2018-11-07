@@ -36,7 +36,7 @@ use hal::dma::DmaExt;
 use hal::dma::CircBufferLinear;
 use hal::dma::dma1;
 use hal::stm32l052;
-use hal::stm32l052::USART2 as USART2_p;
+use hal::stm32l052::USART1 as USART1_p;
 use hal::gpio::{Output, PushPull, gpioa::PA5};
 
 enum Command {
@@ -53,16 +53,16 @@ app! {
     device: stm32l052,
     resources: {
         static END: bool = false;
-        static TX: Tx<USART2_p>;
-        static RI: ReleaseInterupt<USART2_p>;
+        static TX: Tx<USART1_p>;
+        static RI: ReleaseInterupt<USART1_p>;
         static LED: PA5<Output<PushPull>>;
-        static CB: CircBufferLinear<[u8; SIZE_BUF], dma1::C5>;
+        static CB: CircBufferLinear<[u8; SIZE_BUF], dma1::C3>;
     },
     idle: {
         resources: [LED, END, TX, CB],
     },
     tasks: {
-        USART2: {
+        USART1: {
             priority: 1,
             path: end_frame_callback,
             resources: [END, RI],
@@ -80,15 +80,15 @@ fn init(mut p: init::Peripherals, _r: init::Resources) -> init::LateResources {
     let mut led = gpioa.pa5.into_output(&mut gpioa.moder).push_pull(&mut gpioa.otyper);
     let _but = gpioa.pa4.into_input(&mut gpioa.moder).pull_up(&mut gpioa.pupdr);
 
-    let tx = gpioa.pa2.into_alternate(&mut gpioa.moder).af4(&mut gpioa.afrl);
-    let rx = gpioa.pa3.into_alternate(&mut gpioa.moder).af4(&mut gpioa.afrl);
+    let tx = gpioa.pa9.into_alternate(&mut gpioa.moder).af4(&mut gpioa.afrh);
+    let rx = gpioa.pa10.into_alternate(&mut gpioa.moder).af4(&mut gpioa.afrh);
 
-    let serial = Serial::usart2(
-        p.device.USART2,
+    let serial = Serial::usart1(
+        p.device.USART1,
         (tx, rx),
         9_600.bps(),
         clocks,
-        &mut rcc.apb1,
+        &mut rcc.apb2,
         Some(LF)
     );
 
@@ -97,7 +97,7 @@ fn init(mut p: init::Peripherals, _r: init::Resources) -> init::LateResources {
     let (mut tx, mut rx, mut ri) = serial.split();
 
     let buf = singleton!(: [[u8; SIZE_BUF]; 1] = [[0; SIZE_BUF]; 1]).unwrap();
-    let cb = rx.circ_buf_linear(channels.5, buf);
+    let cb = rx.circ_buf_linear(channels.3, buf);
 
     init::LateResources {
         LED: led,
@@ -148,7 +148,7 @@ fn idle(mut t: &mut Threshold, mut r: idle::Resources) -> ! {
     }
 }
 
-fn end_frame_callback(_t: &mut Threshold, mut r: USART2::Resources) {
+fn end_frame_callback(_t: &mut Threshold, mut r: USART1::Resources) {
     *r.END = true;
     r.RI.clear_isr_cmie();
 }

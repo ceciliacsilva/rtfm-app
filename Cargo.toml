@@ -1,6 +1,6 @@
 [package]
 name = "rtfm-app"
-version = "0.1.0"
+version = "0.1.2"
 authors = ["Cecília Carneiro <cecilia.carneiroesilva@gmail.com>"]
 
 
