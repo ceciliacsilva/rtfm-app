@@ -84,11 +84,12 @@ fn init(mut p: init::Peripherals, r: init::Resources) -> init::LateResources {
         9_600.bps(),
         clocks,
         &mut rcc.apb1,
+        None,
     );
 
     serial.listen(Event::Rxne);
 
-    let (mut tx, mut rx) = serial.split();
+    let (mut tx, mut rx, _) = serial.split();
 
     init::LateResources {
         RX: rx,
