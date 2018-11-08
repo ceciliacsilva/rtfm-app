@@ -9,7 +9,7 @@ cortex-m = { git = "https://github.com/ceciliacsilva/cortex-m", version = "0.5.7
 cortex-m-rt = {version = "0.6.4", features = ["device"]} #feature device
 cortex-m-rtfm = { git = "https://github.com/ceciliacsilva/cortex-m-rtfm" }
 cortex-m-semihosting = "0.3.1"
-hal = { path = "../quickstart/narc_rust/hal" }
+hal = { path = "../quickstart/narc_rust/hal", version = "0.1.5" }
 heapless = { version = "0.4.0", features = ["const-fn"] }
 nb = "0.1.1"
 
