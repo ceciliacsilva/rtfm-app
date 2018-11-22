@@ -55,6 +55,7 @@ pub enum StateType {
     Start,
     Auto,
     Manual,
+    Break,
 }
 
 macro_rules! valid_transition {
@@ -65,7 +66,7 @@ macro_rules! valid_transition {
             }
         }
     };
-    ( $self:ident, $new_state:ident, [$from:ident -> $toFisrt:ident, $($toX:ident),*] ) => {
+    ( $self:ident, $new_state:ident, [$from:ident -> $toFisrt:ident $(,$toX:ident)*] ) => {
         if $self.state == StateType::$from {
             if $new_state == StateType::$toFisrt $( || $new_state == StateType::$toX)* {
                 $self.state = $new_state;
@@ -88,8 +89,8 @@ impl FiniteMachine {
     pub fn transition(&mut self, new_state: StateType){
         valid_transition!(self, new_state, [Auto -> Manual, Auto]);
         valid_transition!(self, new_state, [Manual -> Manual, Auto]);
-
-        // valid_transition!(self, new_state, [Auto, Manual -> Auto]);
+        valid_transition!(self, new_state, [Manual -> Break]);
+        valid_transition!(self, new_state, [Break -> Auto]);
     }
 }
 
@@ -183,6 +184,7 @@ fn idle(mut t: &mut Threshold, mut r: idle::Resources) -> ! {
                     StateType::Auto => StateType::Auto,
                     StateType::Manual => StateType::Manual,
                     StateType::Start => StateType::Start,
+                    StateType::Break => StateType::Break,
             });
 
             let (buf1, buf2) = r.CB.partial_peek();
@@ -204,6 +206,7 @@ fn idle(mut t: &mut Threshold, mut r: idle::Resources) -> ! {
                 match &vec[..] {
                     [b'a', b'u', b't', b'o'] => StateType::Auto,
                     [b'm', b'a', b'n', b'u', b'a', b'l'] => StateType::Manual,
+                    [b'b', b'r', b'e', b'a', b'k'] => StateType::Break,
                     _ => state,
             };
             
@@ -227,7 +230,8 @@ fn idle(mut t: &mut Threshold, mut r: idle::Resources) -> ! {
                 _ => (),
             }
 
-            r.FSM.claim_mut(&mut t, |fsm, _| fsm.state = new_state);
+            // r.FSM.claim_mut(&mut t, |fsm, _| fsm.state = new_state);
+            r.FSM.claim_mut(&mut t, |fsm, _| fsm.transition(new_state));
         }
         
         r.END.claim_mut(&mut t, |end, _| *end = false);
@@ -248,7 +252,7 @@ fn button_callback(_t: &mut Threshold, mut r: EXTI4_15::Resources) {
                 r.LED.set_low();
             }
         },
-        _ => {},
+        _ => (),
     };
 
     r.EXTI.pr.modify(|_, w| w.pif0().bit(true));
