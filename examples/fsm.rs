@@ -1,7 +1,6 @@
 #![no_std]
 #![no_main]
 
-
 #[macro_use]
 extern crate cortex_m;
 extern crate cortex_m_rt;
@@ -51,11 +50,28 @@ const SIZE_BUF: usize = 16;
 pub struct FiniteMachine {
     pub state: StateType,
 }
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum StateType {
     Start,
     Auto,
     Manual,
+}
+
+macro_rules! valid_transition {
+    ( $self:ident, $new_state:ident, [$fromFirst:ident, $($fromX:ident),* -> $to:ident] ) => {
+        if $self.state == StateType::$fromFirst $( || $self.state == StateType::$fromX)*{
+            if $new_state == StateType::$to {
+                $self.state = $new_state;
+            }
+        }
+    };
+    ( $self:ident, $new_state:ident, [$from:ident -> $toFisrt:ident, $($toX:ident),*] ) => {
+        if $self.state == StateType::$from {
+            if $new_state == StateType::$toFisrt $( || $new_state == StateType::$toX)* {
+                $self.state = $new_state;
+            }
+        }
+    };
 }
 
 impl FiniteMachine {
@@ -67,6 +83,13 @@ impl FiniteMachine {
 
     pub fn start(&mut self) {
         self.state = StateType::Auto;
+    }
+    
+    pub fn transition(&mut self, new_state: StateType){
+        valid_transition!(self, new_state, [Auto -> Manual, Auto]);
+        valid_transition!(self, new_state, [Manual -> Manual, Auto]);
+
+        // valid_transition!(self, new_state, [Auto, Manual -> Auto]);
     }
 }
 
