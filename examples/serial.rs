@@ -1,4 +1,3 @@
-#![feature(panic_implementation)]
 #![no_std]
 #![no_main]
 
@@ -155,9 +154,7 @@ fn receive_callback(_t: &mut Threshold, mut r: USART2::Resources) {
     r.RB.enqueue(data);
 }
 
-
-#[allow(deprecated)]
-#[panic_implementation]
+#[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
     bkpt();
 

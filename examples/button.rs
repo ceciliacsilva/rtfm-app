@@ -1,4 +1,3 @@
-#![feature(panic_implementation)]
 #![no_std]
 #![no_main]
 
@@ -74,8 +73,7 @@ fn button_callback(_t: &mut Threshold, mut r: EXTI4_15::Resources) {
     }
 }
 
-#[allow(deprecated)]
-#[panic_implementation]
+#[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
     bkpt();
 

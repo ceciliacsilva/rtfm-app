@@ -1,4 +1,3 @@
-#![feature(panic_implementation)]
 #![no_std]
 #![no_main]
 
@@ -153,9 +152,7 @@ fn end_frame_callback(_t: &mut Threshold, mut r: USART1::Resources) {
     r.RI.clear_isr_cmie();
 }
 
-
-#[allow(deprecated)]
-#[panic_implementation]
+#[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
     bkpt();
 

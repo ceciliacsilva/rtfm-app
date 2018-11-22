@@ -1,4 +1,3 @@
-#![feature(panic_implementation)]
 #![no_std]
 #![no_main]
 
@@ -232,8 +231,7 @@ fn button_callback(_t: &mut Threshold, mut r: EXTI4_15::Resources) {
     r.EXTI.pr.modify(|_, w| w.pif0().bit(true));
 }
 
-#[allow(deprecated)]
-#[panic_implementation]
+#[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
     bkpt();
 

@@ -1,4 +1,3 @@
-#![feature(panic_implementation)]
 #![no_std]
 #![no_main]
 
@@ -72,9 +71,7 @@ fn sys_tick(_t: &mut Threshold, mut r: SysTick::Resources) {
 }
 
 
-
-#[allow(deprecated)]
-#[panic_implementation]
+#[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
     bkpt();
 
