@@ -10,7 +10,7 @@ cortex-m = "0.5.8"
 cortex-m-rt = { version = "0.6.5", features = ["device"] }
 cortex-m-rtfm = "0.4.0-beta.2"
 cortex-m-semihosting = "0.3.1"
-narc-hal = { path = "../quickstart/narc_rust/hal", version = "0.1.5" }
+narc-hal = { path = "../quickstart/narc_rust/hal", version = "0.1.6" }
 heapless = { version = "0.4.0", features = ["const-fn"] }
 nb = "0.1.1"
 

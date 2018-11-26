@@ -4,7 +4,6 @@ rustflags = [
   #"-C", "linker=rust-lld",
   #"-C", "link-arg=-Tlink.x",
   "-C", "link-arg=-Tlink.x",
-
 ]
 
 [build]
