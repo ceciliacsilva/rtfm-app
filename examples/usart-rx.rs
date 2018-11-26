@@ -1,7 +1,3 @@
-//! Interrupt doesn't work yet. 
-//! interrupt! -> #[interrupt]
-//! Wait for svd2rust 0.14..
-
 #![feature(custom_attribute)]
 // #![deny(unsafe_code)]
 // #![deny(warnings)]
@@ -38,8 +34,6 @@ use embedded_hal::digital::OutputPin;
 
 use cortex_m::peripheral::syst::SystClkSource;
 
-// interrupt!(USART2, USART2);
-
 #[app(device = narc_hal::stm32l052)]
 const APP: () = {
     static mut SHARED: u32 = 0;
@@ -74,14 +68,6 @@ const APP: () = {
         );
 
         serial.listen(Event::Rxne);
-        serial.listen(Event::Txe);
-
-        // core.SYST.set_clock_source(SystClkSource::Core);
-        // core.SYST.set_reload(2_000_000); // 1s
-        // core.SYST.clear_current();
-        // core.SYST.enable_counter();
-        // core.SYST.enable_interrupt();
-
 
         device.SYSCFG_COMP.exticr2.modify(|_, w| unsafe{ w.exti4().bits(0b0000) });//PA0
         device.EXTI.imr.modify(|_, w| w.im4().bit(true));
@@ -89,8 +75,8 @@ const APP: () = {
 
         let (mut tx, mut rx, mut _ri) = serial.split();
 
-        let data = block!(rx.read()).unwrap();
-        tx.write(data);
+        // let data = block!(rx.read()).unwrap();
+        tx.write(b'o');
 
         // rtfm::pend(Interrupt::EXTI4_15);
         LED = led;
@@ -108,11 +94,6 @@ const APP: () = {
         }
     }
 
-    // #[exception]
-    // fn SysTick () {
-    //     bkpt();
-    // }
-
     #[interrupt(resources = [SHARED, EXTI])]
     fn EXTI4_15 () {
         bkpt();
@@ -122,16 +103,11 @@ const APP: () = {
         resources.EXTI.pr.modify(|_, w| w.pif0().bit(true));
     }
 
-    // #[interrupt(resources = [DATA, RX, TX])]
-    // fn USART2 () {
-    //     *resources.DATA =  resources.RX.read().unwrap();
-
-    //     resources.TX.write(b'i');
-    // }
-
-    #[interrupt]
+    #[interrupt(resources = [DATA, RX, TX])]
     fn USART2 () {
-        bkpt();
+        *resources.DATA = resources.RX.read().unwrap();
+
+        resources.TX.write(b'i');
     }
 };
 
