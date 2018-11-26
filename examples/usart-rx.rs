@@ -11,6 +11,7 @@ extern crate narc_hal;
 extern crate embedded_hal;
 #[macro_use]
 extern crate nb;
+extern crate heapless;
 
 use rtfm::app;
 use rtfm::export::wfi;
@@ -34,18 +35,31 @@ use embedded_hal::digital::OutputPin;
 
 use cortex_m::peripheral::syst::SystClkSource;
 
+use heapless::{
+    consts::*,
+    spsc::{Consumer, Producer, Queue},
+};
+
 #[app(device = narc_hal::stm32l052)]
 const APP: () = {
-    static mut SHARED: u32 = 0;
+    static mut SHARED: bool = false;
     static mut LED: PA5<Output<PushPull>> = ();
     static mut EXTI: narc_hal::stm32l052::EXTI = ();
     static mut RX: Rx<USART2_p> = ();
     static mut TX: Tx<USART2_p> = ();
-    static mut DATA: u8 = 0;
+    static mut Q: Option<Queue<u8, U4>> = None;
+    static mut P: Producer<'static, u8, U4> = ();
+    static mut C: Consumer<'static, u8, U4> = ();
 
-    #[init]
+    #[init(resources=[Q])]
     fn init() {
         let device: narc_hal::stm32l052::Peripherals = device;
+
+        // NOTE: we use `Option` here to work around the lack of
+        // a stable `const` constructor
+        
+        *resources.Q = Some(Queue::new());
+        let (p, c) = resources.Q.as_mut().unwrap().split();
         
         let mut rcc = device.RCC.constrain();
         let mut gpioa = device.GPIOA.split(&mut rcc.iop);
@@ -83,31 +97,38 @@ const APP: () = {
         EXTI = device.EXTI;
         RX = rx;
         TX = tx;
+        P = p;
+        C = c;
     }
 
-    #[idle(resources = [SHARED, LED])]
+    #[idle(resources = [SHARED, LED, C, TX])]
     fn idle () -> ! {
         wfi();
 
         loop {
             resources.LED.set_high();
+
+            if resources.SHARED.lock(|end| *end) {
+                while let Some(c) = resources.C.dequeue() {
+                    resources.TX.write(c);
+                }
+            }
+            
+            resources.SHARED.lock(|end| *end != *end);
         }
     }
 
     #[interrupt(resources = [SHARED, EXTI])]
     fn EXTI4_15 () {
-        bkpt();
-
-        *resources.SHARED += 1;
-
+        // bkpt();
+        *resources.SHARED = true;
         resources.EXTI.pr.modify(|_, w| w.pif0().bit(true));
     }
 
-    #[interrupt(resources = [DATA, RX, TX])]
+    #[interrupt(resources = [P, RX])]
     fn USART2 () {
-        *resources.DATA = resources.RX.read().unwrap();
-
-        resources.TX.write(b'i');
+        let data = resources.RX.read().unwrap();
+        resources.P.enqueue(data).unwrap();
     }
 };
 
