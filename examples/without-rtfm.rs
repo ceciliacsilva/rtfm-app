@@ -34,11 +34,12 @@ fn main () -> ! {
     let device = narc_hal::stm32l052::Peripherals::take().unwrap();
     let mut core = cortex_m::Peripherals::take().unwrap();
 
+    core.NVIC.enable(narc_hal::stm32l052::Interrupt::USART2);
+
     unsafe {
         core.NVIC.set_priority(narc_hal::stm32l052::Interrupt::USART2, 48);
     }
-    core.NVIC.enable(narc_hal::stm32l052::Interrupt::USART2);
-
+    
     //// Systick exception works
     // core.SYST.set_clock_source(SystClkSource::Core);
     // core.SYST.set_reload(2_000_000); // 1s

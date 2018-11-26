@@ -1,3 +1,7 @@
+//! Interrupt doesn't work yet. 
+//! interrupt! -> #[interrupt]
+//! Wait for svd2rust 0.14..
+
 #![feature(custom_attribute)]
 // #![deny(unsafe_code)]
 // #![deny(warnings)]
@@ -19,7 +23,7 @@ use core::sync::atomic::{self, Ordering};
 
 use cortex_m::asm::bkpt;
 
-use narc_hal::stm32l052::Interrupt;
+use narc_hal::stm32l052::interrupt;
 use narc_hal::gpio::GpioExt;
 use narc_hal::rcc::RccExt;
 use narc_hal::flash::FlashExt;
@@ -31,6 +35,10 @@ use narc_hal::gpio::{Output, PushPull, gpioa::PA5};
 use narc_hal::stm32l052::USART2 as USART2_p;
 
 use embedded_hal::digital::OutputPin;
+
+use cortex_m::peripheral::syst::SystClkSource;
+
+// interrupt!(USART2, USART2);
 
 #[app(device = narc_hal::stm32l052)]
 const APP: () = {
@@ -68,6 +76,13 @@ const APP: () = {
         serial.listen(Event::Rxne);
         serial.listen(Event::Txe);
 
+        // core.SYST.set_clock_source(SystClkSource::Core);
+        // core.SYST.set_reload(2_000_000); // 1s
+        // core.SYST.clear_current();
+        // core.SYST.enable_counter();
+        // core.SYST.enable_interrupt();
+
+
         device.SYSCFG_COMP.exticr2.modify(|_, w| unsafe{ w.exti4().bits(0b0000) });//PA0
         device.EXTI.imr.modify(|_, w| w.im4().bit(true));
         device.EXTI.ftsr.modify(|_, w| w.ft4().bit(true));
@@ -93,14 +108,19 @@ const APP: () = {
         }
     }
 
-    // #[interrupt(resources = [SHARED, EXTI])]
-    // fn EXTI4_15 () {
+    // #[exception]
+    // fn SysTick () {
     //     bkpt();
-
-    //     *resources.SHARED += 1;
-
-    //     resources.EXTI.pr.modify(|_, w| w.pif0().bit(true));
     // }
+
+    #[interrupt(resources = [SHARED, EXTI])]
+    fn EXTI4_15 () {
+        bkpt();
+
+        *resources.SHARED += 1;
+
+        resources.EXTI.pr.modify(|_, w| w.pif0().bit(true));
+    }
 
     // #[interrupt(resources = [DATA, RX, TX])]
     // fn USART2 () {
