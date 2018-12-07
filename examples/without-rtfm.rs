@@ -78,9 +78,14 @@ fn main () -> ! {
     loop {}
 }
 
-interrupt!(USART2, usart2);
+// Old model. 
+// interrupt!(USART2, usart2);
 
-fn usart2 () {
+// fn usart2 () {
+//     bkpt();
+// }
+
+fn USART2 () {
     bkpt();
 }
 

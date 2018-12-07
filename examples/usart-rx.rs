@@ -115,6 +115,8 @@ const APP: () = {
             }
             
             resources.SHARED.lock(|end| *end != *end);
+
+            resources.LED.set_low();
         }
     }
 

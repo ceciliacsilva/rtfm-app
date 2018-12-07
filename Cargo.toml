@@ -1,6 +1,6 @@
 [package]
 name = "rtfm-app"
-version = "0.2.0"
+version = "0.2.1"
 description = "RFTM - v0.4beta"
 authors = ["Cecília Carneiro <cecilia.carneiroesilva@gmail.com>"]
 
@@ -8,9 +8,9 @@ authors = ["Cecília Carneiro <cecilia.carneiroesilva@gmail.com>"]
 [dependencies]
 cortex-m = "0.5.8"
 cortex-m-rt = { version = "0.6.5", features = ["device"] }
-cortex-m-rtfm = "0.4.0-beta.2"
+cortex-m-rtfm = { version = "0.4.0-beta.2", features = ["timer-queue"] }
 cortex-m-semihosting = "0.3.1"
-narc-hal = { path = "../quickstart/narc_rust/hal", version = "0.1.6" }
+narc-hal = { path = "../quickstart/narc_rust/hal", version = "0.1.7" }
 heapless = { version = "0.4.0", features = ["const-fn"] }
 nb = "0.1.1"
 
