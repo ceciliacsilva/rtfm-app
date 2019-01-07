@@ -61,12 +61,12 @@ const APP: () = {
     }
 
     // schedule not available to arm-v6 devices using Systick + DWT implementation. cortex-m-rtfm/#109
-    #[interrupt(resources = [EXTI, LED], schedule = [debouncing_handler])]
-    // #[interrupt(resources = [EXTI, LED], spawn = [debouncing_handler])]
+    // #[interrupt(resources = [EXTI, LED], schedule = [debouncing_handler])]
+    #[interrupt(resources = [EXTI, LED], spawn = [debouncing_handler])]
     // #[interrupt(resources = [EXTI, LED])]
     fn EXTI4_15 () {
-        schedule.debouncing_handler(Instant::now() + 1_000_000.cycles()).unwrap();
-        // spawn.debouncing_handler().unwrap();
+        // schedule.debouncing_handler(Instant::now() + 1_000_000.cycles()).unwrap();
+        spawn.debouncing_handler().unwrap();
         // bkpt();
         resources.LED.set_high();
         resources.EXTI.pr.modify(|_, w| w.pif0().bit(true));
