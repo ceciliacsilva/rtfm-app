@@ -41,20 +41,24 @@ use heapless::{
     Vec,
 };
 
+// My expand macro version
+// extern crate state_machine;
+
+#[macro_use]
 extern crate sm;
-use sm::sm;
 
-sm! {
-    Lock {
-        InitialStates { Locked, Unlocked }
-
-        TurnKey {
-            Locked => Unlocked
-            Unlocked => Locked
+sm!{
+    Sm {
+        InitialStates { Auto }
+        Normal {
+            Manual => Auto
+            Auto => Manual
         }
-
-        Break {
-            Locked, Unlocked => Broken
+        Stop {
+            Manual => Break
+        }
+        Reset {
+            Break => Auto
         }
     }
 }
@@ -76,10 +80,9 @@ const APP: () = {
 
         // NOTE: we use `Option` here to work around the lack of
         // a stable `const` constructor
-        
+
         *resources.Q = Some(Queue::new());
         let (p, c) = resources.Q.as_mut().unwrap().split();
-        
         let mut rcc = device.RCC.constrain();
         let mut gpioa = device.GPIOA.split(&mut rcc.iop);
         let mut flash = device.FLASH.constrain();
@@ -123,13 +126,10 @@ const APP: () = {
     #[idle(resources = [SHARED, LED, C, TX])]
     fn idle () -> ! {
         wfi();
+        use Sm::*;
+        use Sm::Variant::*;
 
-        let sm: Sm<Init> = Sm::new();
-
-        let mut sm: Sm<Auto> = Sm::<Auto>::from(sm);
-
-        use crate::Lock::*;
-        let mut lock = Machine::new(Locked).as_enum();
+        let mut sm = Machine::new(Auto).as_enum();
 
         loop {
             resources.LED.set_high();
@@ -137,25 +137,45 @@ const APP: () = {
             let mut frame: Vec<u8, U10> = Vec::new();
             if resources.SHARED.lock(|end| *end) {
                 while let Some(c) = resources.C.dequeue() {
-                    // resources.TX.write(c);
                     frame.push(c);
                 }
             }
 
-            // sm = match sm.as_enum(){
-                // Locked(m) => m.transition(TurnKey),
-                // _ => 
-            // }
+            let command = frame_decoder(&frame);
 
-            if let Variant::InitialLocked(m) = lock {
-                lock = m.transition(TurnKey).as_enum()
-            };
+            // behaviour duplicated for each state
+            let new_sm =
+                match sm {
+                    InitialAuto(m) =>
+                    {
+                        if command == Command::Manual {
+                            m.transition(Normal).as_enum()
+                        }
+                    },
+                    AutoByNormal(m) => {
+                        if command == Command::Manual {
+                            m.transition(Normal).as_enum()
+                        }
+                    },
+                    ManualByNormal(m) => {
+                        if command == Command::Auto {
+                            m.transition(Normal).as_enum()
+                        } else command == Command::Stop {
+                            m.transition(Stop).as_enum()
+                        }
+                    },
+                    BreakByStop(m) =>
+                        if command == Command::Auto {
+                            m.transition(Reset).as_enum(),
+                        }
+                    AutoByReset(m) => {
+                        if command == Command::Manual {
+                            m.transition(Normal).as_enum()
+                        }
+                    },
+               };
 
-            match &frame[..] {
-                [b'a', b'u', b't', b'o'] => sm = Sm::<Auto>::from(sm),
-                [b'm', b'a', b'n', b'u', b'a', b'l'] => sm = Sm::<Auto>::from(sm),
-                _ => (),
-            };
+            sm = new_sm;
 
             resources.SHARED.lock(|end| *end != *end);
 
@@ -177,64 +197,25 @@ const APP: () = {
     }
 };
 
-
-
-struct Sm<S> {
-    state: S,
+#[derive(Eq)]
+enum Command {
+    Auto,
+    Manual,
+    Break,
+    None,
 }
 
-//Add behaviours
-struct Init;
-struct Auto;
-struct Manual;
-struct Break;
-
-impl Sm<Init> {
-    fn new() -> Self {
-        Sm {
-            state: Init,
-        }
+fn frame_decoder(frame: &Vec<u8, U10>) -> Command {
+    match &frame[..] {
+        [b'a', b'u', b't', b'o'] => Command::Auto,
+        [b'm', b'a', b'n', b'u', b'a', b'l'] => Command::Manual,
+        [b'b', b'r', b'e', b'a', b'k'] => Command::Break,
+        _ => Commad::None,
     }
 }
 
-impl From<Sm<Init>> for Sm<Auto> {
-    fn from(_val: Sm<Init>) -> Sm<Auto> {
-        Sm {
-            state: Auto,
-        }
-    }
-}
-
-impl From<Sm<Auto>> for Sm<Manual> {
-    fn from(_val: Sm<Auto>) -> Sm<Manual> {
-        Sm {
-            state: Manual,
-        }
-    }
-}
-
-impl From<Sm<Manual>> for Sm<Auto> {
-    fn from(_val: Sm<Manual>) -> Sm<Auto> {
-        Sm {
-            state: Auto,
-        }
-    }
-}
-
-impl From<Sm<Manual>> for Sm<Break> {
-    fn from(_val: Sm<Manual>) -> Sm<Break> {
-        Sm {
-            state: Break,
-        }
-    }
-}
-
-impl From<Sm<Break>> for Sm<Auto> {
-    fn from(_val: Sm<Break>) -> Sm<Auto> {
-        Sm {
-            state: Auto,
-        }
-    }
+fn goto_state(command: Command, m: Sm) -> Sm::Variant {
+    m.transition(Normal).as_enum()
 }
 
 #[panic_handler]
