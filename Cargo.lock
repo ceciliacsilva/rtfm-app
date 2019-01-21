@@ -217,7 +217,7 @@ dependencies = [
  "heapless 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "narc-hal 0.1.8",
  "nb 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "sm 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "state-machine 0.1.0",
 ]
 
 [[package]]
@@ -263,6 +263,13 @@ dependencies = [
 name = "stable_deref_trait"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "state-machine"
+version = "0.1.0"
+dependencies = [
+ "sm 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "stm32l052"

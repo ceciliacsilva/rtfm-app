@@ -41,23 +41,7 @@ use heapless::{
     Vec,
 };
 
-extern crate sm;
-use sm::sm;
-
-sm! {
-    Lock {
-        InitialStates { Locked, Unlocked }
-
-        TurnKey {
-            Locked => Unlocked
-            Unlocked => Locked
-        }
-
-        Break {
-            Locked, Unlocked => Broken
-        }
-    }
-}
+extern crate state_machine;
 
 #[app(device = narc_hal::stm32l052)]
 const APP: () = {
@@ -123,13 +107,9 @@ const APP: () = {
     #[idle(resources = [SHARED, LED, C, TX])]
     fn idle () -> ! {
         wfi();
+        use state_machine::*;
 
-        let sm: Sm<Init> = Sm::new();
-
-        let mut sm: Sm<Auto> = Sm::<Auto>::from(sm);
-
-        use crate::Lock::*;
-        let mut lock = Machine::new(Locked).as_enum();
+        let sm = Machine::new(Auto);
 
         loop {
             resources.LED.set_high();
@@ -141,21 +121,6 @@ const APP: () = {
                     frame.push(c);
                 }
             }
-
-            // sm = match sm.as_enum(){
-                // Locked(m) => m.transition(TurnKey),
-                // _ => 
-            // }
-
-            if let Variant::InitialLocked(m) = lock {
-                lock = m.transition(TurnKey).as_enum()
-            };
-
-            match &frame[..] {
-                [b'a', b'u', b't', b'o'] => sm = Sm::<Auto>::from(sm),
-                [b'm', b'a', b'n', b'u', b'a', b'l'] => sm = Sm::<Auto>::from(sm),
-                _ => (),
-            };
 
             resources.SHARED.lock(|end| *end != *end);
 
@@ -177,65 +142,6 @@ const APP: () = {
     }
 };
 
-
-
-struct Sm<S> {
-    state: S,
-}
-
-//Add behaviours
-struct Init;
-struct Auto;
-struct Manual;
-struct Break;
-
-impl Sm<Init> {
-    fn new() -> Self {
-        Sm {
-            state: Init,
-        }
-    }
-}
-
-impl From<Sm<Init>> for Sm<Auto> {
-    fn from(_val: Sm<Init>) -> Sm<Auto> {
-        Sm {
-            state: Auto,
-        }
-    }
-}
-
-impl From<Sm<Auto>> for Sm<Manual> {
-    fn from(_val: Sm<Auto>) -> Sm<Manual> {
-        Sm {
-            state: Manual,
-        }
-    }
-}
-
-impl From<Sm<Manual>> for Sm<Auto> {
-    fn from(_val: Sm<Manual>) -> Sm<Auto> {
-        Sm {
-            state: Auto,
-        }
-    }
-}
-
-impl From<Sm<Manual>> for Sm<Break> {
-    fn from(_val: Sm<Manual>) -> Sm<Break> {
-        Sm {
-            state: Break,
-        }
-    }
-}
-
-impl From<Sm<Break>> for Sm<Auto> {
-    fn from(_val: Sm<Break>) -> Sm<Auto> {
-        Sm {
-            state: Auto,
-        }
-    }
-}
 
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
