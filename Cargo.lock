@@ -217,7 +217,10 @@ dependencies = [
  "heapless 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "narc-hal 0.1.8",
  "nb 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+<<<<<<< HEAD
  "sm 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
+=======
+>>>>>>> 246e9cf81e64b6b441c5af9ee8af1cd0ea2f6674
  "state-machine 0.1.0",
 ]
 
