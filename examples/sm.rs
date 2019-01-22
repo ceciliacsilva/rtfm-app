@@ -60,7 +60,23 @@ sm!{
         Reset {
             Break => Auto
         }
+        Same {
+            Manual => Manual
+            Auto => Auto
+            Break => Break
+        }
     }
+}
+
+macro_rules! next_state{
+    ( $m:expr, $command:expr, $variant:ident, $transition:expr ) =>
+    {
+        if $command == Command::$variant {
+            $m.transition($transition).as_enum()
+        } else {
+            $m.transition($transition).as_enum()
+        }
+    };
 }
 
 #[app(device = narc_hal::stm32l052)]
@@ -148,31 +164,42 @@ const APP: () = {
                 match sm {
                     InitialAuto(m) =>
                     {
-                        if command == Command::Manual {
-                            m.transition(Normal).as_enum()
-                        }
+                        next_state!(m, command, Manual, Normal)
+                        // if command == Command::Manual {
+                        //      m.transition(Normal).as_enum()
+                        // }
                     },
                     AutoByNormal(m) => {
                         if command == Command::Manual {
                             m.transition(Normal).as_enum()
+                        } else {
+                            m.transition(Same).as_enum()
                         }
                     },
                     ManualByNormal(m) => {
                         if command == Command::Auto {
                             m.transition(Normal).as_enum()
-                        } else command == Command::Stop {
+                        } else if command == Command::Break {
                             m.transition(Stop).as_enum()
+                        } else {
+                            m.transition(Same).as_enum()
                         }
                     },
-                    BreakByStop(m) =>
+                    BreakByStop(m) => {
                         if command == Command::Auto {
-                            m.transition(Reset).as_enum(),
+                            m.transition(Reset).as_enum()
+                        } else {
+                            m.transition(Same).as_enum()
                         }
+                    },
                     AutoByReset(m) => {
                         if command == Command::Manual {
                             m.transition(Normal).as_enum()
+                        } else {
+                            m.transition(Same).as_enum()
                         }
                     },
+                    _ => sm,
                };
 
             sm = new_sm;
@@ -197,7 +224,7 @@ const APP: () = {
     }
 };
 
-#[derive(Eq)]
+#[derive(PartialEq)]
 enum Command {
     Auto,
     Manual,
@@ -210,13 +237,11 @@ fn frame_decoder(frame: &Vec<u8, U10>) -> Command {
         [b'a', b'u', b't', b'o'] => Command::Auto,
         [b'm', b'a', b'n', b'u', b'a', b'l'] => Command::Manual,
         [b'b', b'r', b'e', b'a', b'k'] => Command::Break,
-        _ => Commad::None,
+        _ => Command::None,
     }
 }
 
-fn goto_state(command: Command, m: Sm) -> Sm::Variant {
-    m.transition(Normal).as_enum()
-}
+
 
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
