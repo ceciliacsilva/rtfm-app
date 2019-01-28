@@ -28,7 +28,7 @@ use narc_hal::serial::Serial;
 use narc_hal::serial::{Rx, Event, Tx};
 use narc_hal::time::U32Ext;
 use embedded_hal::prelude::*;
-use narc_hal::gpio::{Output, PushPull, gpioa::PA5};
+use narc_hal::gpio::{Output, PushPull, gpioa::PA5, gpioa::PA4, Input, PullUp};
 use narc_hal::stm32l052::USART2 as USART2_p;
 
 use embedded_hal::digital::OutputPin;
@@ -41,54 +41,26 @@ use heapless::{
     Vec,
 };
 
-// My expand macro version
-// extern crate state_machine;
-
 #[macro_use]
 extern crate sm;
+use sm::sm;
 
-sm!{
-    Sm {
-        InitialStates { Auto }
-        Normal {
-            Manual => Auto
-            Auto => Manual
-        }
-        Stop {
-            Manual => Break
-        }
-        Reset {
-            Break => Auto
-        }
-        Same {
-            Manual => Manual
-            Auto => Auto
-            Break => Break
-        }
-    }
-}
+type Led<'a> = &'a mut PA5<Output<PushPull>>;
+type Command_p<'a> = &'a Command;
 
-macro_rules! next_state{
-    ( $m:expr, $command:expr, $variant:ident, $transition:expr ) =>
-    {
-        if $command == Command::$variant {
-            $m.transition($transition).as_enum()
-        } else {
-            $m.transition($transition).as_enum()
-        }
-    };
-}
+
 
 #[app(device = narc_hal::stm32l052)]
 const APP: () = {
     static mut SHARED: bool = false;
     static mut LED: PA5<Output<PushPull>> = ();
+    static mut BUT: PA4<Input<PullUp>> = ();
     static mut EXTI: narc_hal::stm32l052::EXTI = ();
     static mut RX: Rx<USART2_p> = ();
     static mut TX: Tx<USART2_p> = ();
-    static mut Q: Option<Queue<u8, U4>> = None;
-    static mut P: Producer<'static, u8, U4> = ();
-    static mut C: Consumer<'static, u8, U4> = ();
+    static mut Q: Option<Queue<u8, U8>> = None;
+    static mut P: Producer<'static, u8, U8> = ();
+    static mut C: Consumer<'static, u8, U8> = ();
 
     #[init(resources=[Q])]
     fn init() {
@@ -105,7 +77,7 @@ const APP: () = {
         let clocks = rcc.cfgr.freeze(&mut flash.acr);
 
         let led = gpioa.pa5.into_output(&mut gpioa.moder).push_pull(&mut gpioa.otyper);
-        let _but = gpioa.pa4.into_input(&mut gpioa.moder).pull_up(&mut gpioa.pupdr);
+        let but = gpioa.pa4.into_input(&mut gpioa.moder).pull_up(&mut gpioa.pupdr);
 
         let tx = gpioa.pa2.into_alternate(&mut gpioa.moder).af4(&mut gpioa.afrl);
         let rx = gpioa.pa3.into_alternate(&mut gpioa.moder).af4(&mut gpioa.afrl);
@@ -121,17 +93,17 @@ const APP: () = {
 
         serial.listen(Event::Rxne);
 
-        device.SYSCFG_COMP.exticr2.modify(|_, w| unsafe{ w.exti4().bits(0b0000) });//PA0
+        device.SYSCFG_COMP.exticr2.modify(|_, w| unsafe{ w.exti4().bits(0b0000) });//PA[x]
         device.EXTI.imr.modify(|_, w| w.im4().bit(true));
         device.EXTI.ftsr.modify(|_, w| w.ft4().bit(true));
 
         let (mut tx, mut rx, mut _ri) = serial.split();
 
         // let data = block!(rx.read()).unwrap();
-        tx.write(b'o');
+        // tx.write(b'o');
 
-        // rtfm::pend(Interrupt::EXTI4_15);
         LED = led;
+        BUT = but;
         EXTI = device.EXTI;
         RX = rx;
         TX = tx;
@@ -142,90 +114,63 @@ const APP: () = {
     #[idle(resources = [SHARED, LED, C, TX])]
     fn idle () -> ! {
         wfi();
+
         use Sm::*;
-        use Sm::Variant::*;
 
         let mut sm = Machine::new(Auto).as_enum();
 
         loop {
-            resources.LED.set_high();
-
-            let mut frame: Vec<u8, U10> = Vec::new();
             if resources.SHARED.lock(|end| *end) {
+                // resources.LED.set_high();
+                let mut frame: Vec<u8, U10> = Vec::new();
+
                 while let Some(c) = resources.C.dequeue() {
                     frame.push(c);
+                    // resources.TX.write(c);
                 }
+
+                // resources.TX.write(b'o');
+
+                let command = frame_decoder(&frame);
+
+                sm = sm.eval_machine(&command, resources.LED);
             }
 
-            let command = frame_decoder(&frame);
+            // resources.SHARED.lock(|end| *end != false);
 
-            // behaviour duplicated for each state
-            let new_sm =
-                match sm {
-                    InitialAuto(m) =>
-                    {
-                        next_state!(m, command, Manual, Normal)
-                        // if command == Command::Manual {
-                        //      m.transition(Normal).as_enum()
-                        // }
-                    },
-                    AutoByNormal(m) => {
-                        if command == Command::Manual {
-                            m.transition(Normal).as_enum()
-                        } else {
-                            m.transition(Same).as_enum()
-                        }
-                    },
-                    ManualByNormal(m) => {
-                        if command == Command::Auto {
-                            m.transition(Normal).as_enum()
-                        } else if command == Command::Break {
-                            m.transition(Stop).as_enum()
-                        } else {
-                            m.transition(Same).as_enum()
-                        }
-                    },
-                    BreakByStop(m) => {
-                        if command == Command::Auto {
-                            m.transition(Reset).as_enum()
-                        } else {
-                            m.transition(Same).as_enum()
-                        }
-                    },
-                    AutoByReset(m) => {
-                        if command == Command::Manual {
-                            m.transition(Normal).as_enum()
-                        } else {
-                            m.transition(Same).as_enum()
-                        }
-                    },
-                    _ => sm,
-               };
-
-            sm = new_sm;
-
-            resources.SHARED.lock(|end| *end != *end);
-
-            resources.LED.set_low();
+            // resources.LED.set_low();
         }
     }
 
-    #[interrupt(resources = [SHARED, EXTI])]
-    fn EXTI4_15 () {
-        // bkpt();
-        *resources.SHARED = true;
-        resources.EXTI.pr.modify(|_, w| w.pif0().bit(true));
-    }
+    // #[interrupt(resources = [SHARED, BUT, EXTI])]
+    // fn EXTI4_15 () {
+    //     // bkpt();
 
-    #[interrupt(resources = [P, RX])]
+    //     if resources.BUT.is_low() {
+    //         *resources.SHARED = true;
+    //     }
+    //     resources.EXTI.pr.modify(|_, w| w.pif4().bit(true));
+    // }
+
+    #[interrupt(resources = [P, RX, SHARED])]
     fn USART2 () {
         let data = resources.RX.read().unwrap();
-        resources.P.enqueue(data).unwrap();
+
+        if data == b'\n' {
+            *resources.SHARED = true;
+        } else {
+            resources.P.enqueue(data).unwrap();
+            *resources.SHARED = false;
+        }
+    }
+
+    extern "C" {
+        fn TIM2();
     }
 };
 
-#[derive(PartialEq)]
-enum Command {
+#[derive(PartialEq, Clone)]
+pub enum Command {
     Auto,
     Manual,
     Break,
@@ -241,7 +186,67 @@ fn frame_decoder(frame: &Vec<u8, U10>) -> Command {
     }
 }
 
+sm!{
+    Sm {
+        GuardResources {
+            command: Command_p
+        }
+        ActionResources {
+            led: Led
+        }
+        InitialStates { Auto }
+        ToManual {
+            Auto => Manual
+        }
+        ToAuto {
+            Manual => Auto
+        }
+        Halt {
+            Manual => Stop
+        }
+        Reset {
+            Stop => Auto
+        }
+    }
+}
 
+impl ValidEvent for ToManual {
+    fn is_enabled(command: Command_p) -> bool {
+        command == &Command::Manual
+    }
+    fn action(led: Led) {
+        // bkpt();
+        led.set_high()
+    }
+}
+
+impl ValidEvent for ToAuto {
+    fn is_enabled(command: Command_p) -> bool {
+        command == &Command::Auto
+    }
+    fn action(led: Led) {
+        // bkpt();
+        led.set_low()
+    }
+}
+
+impl ValidEvent for Halt {
+    fn is_enabled(command: Command_p) -> bool {
+        command == &Command::Break
+    }
+    fn action(led: Led) {
+        led.set_high()
+    }
+}
+
+impl ValidEvent for Reset {
+    fn is_enabled(command: Command_p) -> bool {
+        command == &Command::Auto
+    }
+    fn action(led: Led) {
+        led.set_high()
+    }
+}
 
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {

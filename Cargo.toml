@@ -14,7 +14,7 @@ narc-hal = { path = "../quickstart/narc_rust/hal", version = "0.1.8" }
 heapless = { version = "0.4.0", features = ["const-fn"] }
 nb = "0.1.1"
 state-machine = { version = "0.1.0", path = "/home/ceciliacarneiro/ufu/mestrado/pesquisa/rust/state-machines"}
-sm = { version = "0.7.0" }
+sm = { version = "0.7.0", path = "../../github/sm/sm" }
 
 [dependencies.embedded-hal]
 version = "0.2.1"

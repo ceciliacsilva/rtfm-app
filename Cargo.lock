@@ -217,7 +217,7 @@ dependencies = [
  "heapless 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "narc-hal 0.1.8",
  "nb 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "sm 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "sm 0.7.1",
  "state-machine 0.1.0",
 ]
 
@@ -251,9 +251,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "sm"
+version = "0.7.1"
+dependencies = [
+ "sm_macro 0.7.1",
+]
+
+[[package]]
 name = "sm_macro"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "proc-macro2 0.4.26 (registry+https://github.com/rust-lang/crates.io-index)",
+ "quote 0.6.11 (registry+https://github.com/rust-lang/crates.io-index)",
+ "syn 0.15.26 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "sm_macro"
+version = "0.7.1"
 dependencies = [
  "proc-macro2 0.4.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "quote 0.6.11 (registry+https://github.com/rust-lang/crates.io-index)",
