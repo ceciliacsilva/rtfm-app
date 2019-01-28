@@ -48,8 +48,6 @@ use sm::sm;
 type Led<'a> = &'a mut PA5<Output<PushPull>>;
 type Command_p<'a> = &'a Command;
 
-
-
 #[app(device = narc_hal::stm32l052)]
 const APP: () = {
     static mut SHARED: bool = false;
@@ -99,9 +97,6 @@ const APP: () = {
 
         let (mut tx, mut rx, mut _ri) = serial.split();
 
-        // let data = block!(rx.read()).unwrap();
-        // tx.write(b'o');
-
         LED = led;
         BUT = but;
         EXTI = device.EXTI;
@@ -116,41 +111,31 @@ const APP: () = {
         wfi();
 
         use Sm::*;
-
         let mut sm = Machine::new(Auto).as_enum();
 
         loop {
             if resources.SHARED.lock(|end| *end) {
-                // resources.LED.set_high();
                 let mut frame: Vec<u8, U10> = Vec::new();
 
                 while let Some(c) = resources.C.dequeue() {
                     frame.push(c);
-                    // resources.TX.write(c);
                 }
 
-                // resources.TX.write(b'o');
-
                 let command = frame_decoder(&frame);
-
                 sm = sm.eval_machine(&command, resources.LED);
             }
 
-            // resources.SHARED.lock(|end| *end != false);
-
-            // resources.LED.set_low();
+            resources.SHARED.lock(|end| *end != false);
         }
     }
 
-    // #[interrupt(resources = [SHARED, BUT, EXTI])]
-    // fn EXTI4_15 () {
-    //     // bkpt();
-
-    //     if resources.BUT.is_low() {
-    //         *resources.SHARED = true;
-    //     }
-    //     resources.EXTI.pr.modify(|_, w| w.pif4().bit(true));
-    // }
+    #[interrupt(resources = [SHARED, BUT, EXTI])]
+    fn EXTI4_15 () {
+        if resources.BUT.is_low() {
+            *resources.SHARED = true;
+        }
+        resources.EXTI.pr.modify(|_, w| w.pif4().bit(true));
+    }
 
     #[interrupt(resources = [P, RX, SHARED])]
     fn USART2 () {
@@ -162,10 +147,6 @@ const APP: () = {
             resources.P.enqueue(data).unwrap();
             *resources.SHARED = false;
         }
-    }
-
-    extern "C" {
-        fn TIM2();
     }
 };
 
