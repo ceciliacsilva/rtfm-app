@@ -28,10 +28,11 @@ use narc_hal::serial::Serial;
 use narc_hal::serial::{Rx, Event, Tx};
 use narc_hal::time::U32Ext;
 use embedded_hal::prelude::*;
-use narc_hal::gpio::{Output, PushPull, gpioa::PA5, gpioa::PA4, Input, PullUp};
+use narc_hal::gpio::{Output, PushPull, gpioa::PA5, gpioa::PA4, Input, PullUp, AF5};
 use narc_hal::stm32l052::USART2 as USART2_p;
-
+use narc_hal::pwm::PwmExt;
 use embedded_hal::digital::OutputPin;
+use embedded_hal::PwmPin;
 
 use cortex_m::peripheral::syst::SystClkSource;
 
@@ -45,13 +46,14 @@ use heapless::{
 extern crate sm;
 use sm::sm;
 
-type Led<'a> = &'a mut PA5<Output<PushPull>>;
+type Led<'a> = &'a mut narc_hal::pwm::Pwm<narc_hal::stm32l052::TIM2, narc_hal::pwm::C1>;
 type Command_p<'a> = &'a Command;
 
 #[app(device = narc_hal::stm32l052)]
 const APP: () = {
     static mut SHARED: bool = false;
-    static mut LED: PA5<Output<PushPull>> = ();
+    static mut LED: narc_hal::pwm::Pwm<narc_hal::stm32l052::TIM2, narc_hal::pwm::C1> = ();
+    static LED_MAX: u16 = ();
     static mut BUT: PA4<Input<PullUp>> = ();
     static mut EXTI: narc_hal::stm32l052::EXTI = ();
     static mut RX: Rx<USART2_p> = ();
@@ -74,8 +76,15 @@ const APP: () = {
         let mut flash = device.FLASH.constrain();
         let clocks = rcc.cfgr.freeze(&mut flash.acr);
 
-        let led = gpioa.pa5.into_output(&mut gpioa.moder).push_pull(&mut gpioa.otyper);
         let but = gpioa.pa4.into_input(&mut gpioa.moder).pull_up(&mut gpioa.pupdr);
+        let led = gpioa.pa5.into_alternate(&mut gpioa.moder).af5(&mut gpioa.afrl);
+        let mut led = device.TIM2
+            .pwm(
+                led,
+                3.hz(),
+                clocks,
+                &mut rcc.apb1,
+            );
 
         let tx = gpioa.pa2.into_alternate(&mut gpioa.moder).af4(&mut gpioa.afrl);
         let rx = gpioa.pa3.into_alternate(&mut gpioa.moder).af4(&mut gpioa.afrl);
@@ -97,7 +106,11 @@ const APP: () = {
 
         let (mut tx, mut rx, mut _ri) = serial.split();
 
+        let max = led.get_max_duty();
+        led.enable();
+
         LED = led;
+        LED_MAX = max;
         BUT = but;
         EXTI = device.EXTI;
         RX = rx;
@@ -106,7 +119,7 @@ const APP: () = {
         C = c;
     }
 
-    #[idle(resources = [SHARED, LED, C, TX])]
+    #[idle(resources = [SHARED, LED, C, TX, LED_MAX])]
     fn idle () -> ! {
         wfi();
 
@@ -122,7 +135,7 @@ const APP: () = {
                 }
 
                 let command = frame_decoder(&frame);
-                sm = sm.eval_machine(&command, resources.LED);
+                sm = sm.eval_machine(&command, resources.LED, *resources.LED_MAX);
             }
 
             resources.SHARED.lock(|end| *end != false);
@@ -170,10 +183,11 @@ fn frame_decoder(frame: &Vec<u8, U10>) -> Command {
 sm!{
     Sm {
         GuardResources {
-            command: Command_p
+            {command: Command_p}
         }
         ActionResources {
-            led: Led
+            {led: Led}
+            {max: u16}
         }
         InitialStates { Auto }
         ToManual {
@@ -195,9 +209,9 @@ impl ValidEvent for ToManual {
     fn is_enabled(command: Command_p) -> bool {
         command == &Command::Manual
     }
-    fn action(led: Led) {
+    fn action(led: Led, max: u16) {
         // bkpt();
-        led.set_high()
+        led.set_duty( max / 4 );
     }
 }
 
@@ -205,9 +219,8 @@ impl ValidEvent for ToAuto {
     fn is_enabled(command: Command_p) -> bool {
         command == &Command::Auto
     }
-    fn action(led: Led) {
-        // bkpt();
-        led.set_low()
+    fn action(led: Led, max: u16) {
+        led.set_duty( max / 2 );
     }
 }
 
@@ -215,8 +228,8 @@ impl ValidEvent for Halt {
     fn is_enabled(command: Command_p) -> bool {
         command == &Command::Break
     }
-    fn action(led: Led) {
-        led.set_high()
+    fn action(led: Led, _max: u16) {
+        led.set_duty(0);
     }
 }
 
@@ -224,8 +237,8 @@ impl ValidEvent for Reset {
     fn is_enabled(command: Command_p) -> bool {
         command == &Command::Auto
     }
-    fn action(led: Led) {
-        led.set_high()
+    fn action(led: Led, max: u16) {
+        led.set_duty(max);
     }
 }
 
