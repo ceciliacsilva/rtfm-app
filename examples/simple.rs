@@ -23,7 +23,6 @@ const APP: () = {
     fn init() {
         let mut rcc = device.RCC.constrain();
         let mut gpioa = device.GPIOA.split(&mut rcc.iop);
-        
         let mut led = gpioa.pa5.into_output(&mut gpioa.moder).push_pull(&mut gpioa.otyper);
 
         led.set_high();
