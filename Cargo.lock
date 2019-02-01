@@ -118,7 +118,7 @@ dependencies = [
 
 [[package]]
 name = "narc-hal"
-version = "0.1.8"
+version = "0.2.0"
 dependencies = [
  "cast 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "cortex-m 0.5.8 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -216,7 +216,7 @@ dependencies = [
  "cortex-m-semihosting 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "embedded-hal 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "heapless 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "narc-hal 0.1.8",
+ "narc-hal 0.2.0",
  "nb 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "sm 0.7.1",
  "state-machine 0.1.0",

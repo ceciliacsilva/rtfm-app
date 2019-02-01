@@ -17,10 +17,11 @@ use cortex_m::asm::bkpt;
 use narc_hal::rcc::RccExt;
 use narc_hal::gpio::GpioExt;
 use narc_hal::flash::FlashExt;
-use narc_hal::adc::{adc_config, adc_read};
 use narc_hal::gpio::{gpioa::PA5, Output, PushPull, gpioa::PA4, Input, PullUp};
 use narc_hal::time::U32Ext;
 use narc_hal::timer;
+use narc_hal::adc::AdcExt;
+use narc_hal::timer::TimerExt;
 use embedded_hal::digital::OutputPin;
 use embedded_hal::digital::InputPin;
 use cortex_m::peripheral::syst::SystClkSource;
@@ -50,22 +51,20 @@ const APP: () = {
         let led = gpioa.pa5.into_output(&mut gpioa.moder).push_pull(&mut gpioa.otyper);
         let mut adc: narc_hal::stm32l052::ADC = device.ADC;
         let clocks = rcc.cfgr.freeze(&mut flash.acr);
-        let mut tim = timer::Timer::tim6(device.TIM6, 200.hz(), clocks, &mut rcc.apb1);
+        let mut tim = device.TIM6.timer(200.hz(), clocks, &mut rcc.apb1);
         let b1 = gpioa.pa4.into_input(&mut gpioa.moder).pull_up(&mut gpioa.pupdr);
+        let adc_in = gpioa.pa2.into_analog(&mut gpioa.moder, &mut gpioa.pupdr);
+        use Sm::*;
+        let sm = Machine::new(Idle).as_enum();
 
+        adc.config(adc_in, &mut rcc.apb2);
         tim.listen(timer::Event::TimeOut);
-
-        gpioa.pa2.into_analog(&mut gpioa.moder, &mut gpioa.pupdr);
-        adc_config(&mut rcc.apb2, &mut adc);
 
         core.SYST.set_clock_source(SystClkSource::Core);
         core.SYST.set_reload(2_000); // 1ms
         core.SYST.clear_current();
         core.SYST.enable_counter();
         core.SYST.enable_interrupt();
-
-        use Sm::*;
-        let sm = Machine::new(Idle).as_enum();
 
         SM = sm;
         ADC = adc;
@@ -75,16 +74,14 @@ const APP: () = {
 
     #[idle()]
     fn idle() -> ! {
-        // cortex_m::peripheral::SCB::set_pendst();
         loop {
-            // resources.LED.lock(|led| led.set_high());
             wfi();
         }
     }
 
     #[exception(resources = [SM, ADC, ADC_VALUE], priority = 4)]
     fn SysTick () {
-        *resources.ADC_VALUE = adc_read(&resources.ADC);
+        *resources.ADC_VALUE = resources.ADC.read();
 
         cortex_m::peripheral::SCB::set_pendsv();
     }
