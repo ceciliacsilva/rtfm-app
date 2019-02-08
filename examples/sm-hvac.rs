@@ -104,8 +104,19 @@ const APP: () = {
         let t_ref = resources.T_REF.lock(|t_ref| *t_ref);
 
         resources.SM.lock(|sm_old| {
-            let sm = Sm::Variant::eval_machine(sm_old, t_amb.into(), t_ref, 100, c, h);
-            *sm_old = sm;
+            // let sm = Sm::Variant::eval_machine(sm_old, t_amb.into(), t_ref, 100, c, h);
+            // *sm_old = sm;
+            let result = sm_old.eval_machine(t_amb, t_ref, 100, c, h);
+            match result {
+                Ok(_) => (),
+                Err(_) => {
+                    //At least two transitions enabled.
+                    //Stay in the same state,
+                    //here the user must handler the error.
+                    //Like
+                    *sm_old = Sm::Machine::new(Sm::Idle).as_enum();
+                }
+            }
         });
 
         if *c == 1 {
@@ -136,9 +147,6 @@ const APP: () = {
         }
     }
 
-    extern "C" {
-        fn TIM2();
-    }
 };
 
 sm!{
