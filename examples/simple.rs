@@ -6,6 +6,7 @@ extern crate cortex_m_rt;
 extern crate rtfm;
 extern crate narc_hal;
 extern crate embedded_hal;
+extern crate timer_wheels;
 
 use rtfm::app;
 use rtfm::export::wfi;
@@ -23,7 +24,6 @@ const APP: () = {
     fn init() {
         let mut rcc = device.RCC.constrain();
         let mut gpioa = device.GPIOA.split(&mut rcc.iop);
-        
         let mut led = gpioa.pa5.into_output(&mut gpioa.moder).push_pull(&mut gpioa.otyper);
 
         led.set_high();

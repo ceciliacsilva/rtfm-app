@@ -10,11 +10,11 @@ cortex-m = "0.5.8"
 cortex-m-rt = { version = "0.6.5", features = ["device"] }
 cortex-m-rtfm = { version = "0.4.0" }
 cortex-m-semihosting = "0.3.1"
-narc-hal = { path = "../quickstart/narc_rust/hal", version = "0.1.8" }
+narc-hal = { path = "../quickstart/narc_rust/hal", version = "0.2.0" }
 heapless = { version = "0.4.0", features = ["const-fn"] }
 nb = "0.1.1"
-state-machine = { version = "0.1.0", path = "/home/ceciliacarneiro/ufu/mestrado/pesquisa/rust/state-machines"}
-sm = { version = "0.7.0" }
+sm = { version = "0.1.0", path = "../../github/sm-rtfm/sm" }
+timer-wheels = { version = "0.2.0", git = "https://github.com/ceciliacsilva/timer_wheel" }
 
-[dependencies.embedded-hal]
+[dependencies.embedded-hal ]
 version = "0.2.1"
