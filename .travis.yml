@@ -14,3 +14,5 @@ script:
   - cargo build --example serial-dma
   - cargo build --example serial
   - cargo build --example button
+  - cargo build --example tw-simple
+  - cargo build --example sm-hvac
