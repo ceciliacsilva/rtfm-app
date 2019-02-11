@@ -28,7 +28,7 @@ use narc_hal::timer;
 use narc_hal::timer::TimerExt;
 use embedded_hal::digital::OutputPin;
 use embedded_hal::timer::CountDown;
-use tw::WheelTimer;
+use tw::TimerWheel;
 
 pub enum Functions {
     Callee,
@@ -37,7 +37,7 @@ pub enum Functions {
 #[app(device = narc_hal::stm32l052)]
 const APP: () = {
     static mut LED: PA5<Output<PushPull>> = ();
-    static mut TW: WheelTimer<Functions> = ();
+    static mut TW: TimerWheel<Functions> = ();
     static mut STATE: bool = true;
     static mut TIM6: timer::Timer<TIM6_p> = ();
 
@@ -49,7 +49,7 @@ const APP: () = {
         let mut led = gpioa.pa5.into_output(&mut gpioa.moder).push_pull(&mut gpioa.otyper);
         let clocks = rcc.cfgr.freeze(&mut flash.acr);
         let mut tim = device.TIM6.timer(1.hz(), clocks, &mut rcc.apb1);
-        let mut timer_wheel = WheelTimer::new();
+        let mut timer_wheel = TimerWheel::new();
 
         timer_wheel.schedule(0, Functions::Callee);
         timer_wheel.schedule(2, Functions::Callee);
