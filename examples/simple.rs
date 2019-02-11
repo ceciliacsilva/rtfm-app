@@ -6,6 +6,7 @@ extern crate cortex_m_rt;
 extern crate rtfm;
 extern crate narc_hal;
 extern crate embedded_hal;
+extern crate timer_wheels;
 
 use rtfm::app;
 use rtfm::export::wfi;

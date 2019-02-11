@@ -118,7 +118,7 @@ dependencies = [
 
 [[package]]
 name = "narc-hal"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "cast 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "cortex-m 0.5.8 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -216,9 +216,10 @@ dependencies = [
  "cortex-m-semihosting 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "embedded-hal 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "heapless 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "narc-hal 0.2.0",
+ "narc-hal 0.2.1",
  "nb 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "sm 0.1.0",
+ "timer-wheels 0.1.0",
 ]
 
 [[package]]
@@ -282,6 +283,14 @@ dependencies = [
  "proc-macro2 0.4.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "quote 0.6.11 (registry+https://github.com/rust-lang/crates.io-index)",
  "unicode-xid 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "timer-wheels"
+version = "0.1.0"
+dependencies = [
+ "cortex-m-rtfm 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "heapless 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
