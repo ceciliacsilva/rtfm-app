@@ -14,7 +14,7 @@ narc-hal = { path = "../quickstart/narc_rust/hal", version = "0.2.0" }
 heapless = { version = "0.4.0", features = ["const-fn"] }
 nb = "0.1.1"
 sm = { version = "0.1.0", path = "../../github/sm-rtfm/sm" }
-timer-wheels = { version = "0.2.0", git = "https://github.com/ceciliacsilva/timer_wheel" }
+timer-wheels = { version = "0.3.0", git = "https://github.com/ceciliacsilva/timer_wheel" }
 
 [dependencies.embedded-hal ]
 version = "0.2.1"
