@@ -14,8 +14,7 @@ use rtfm::export::wfi;
 use core::panic::PanicInfo;
 use core::sync::atomic::{self, Ordering};
 
-use heapless::consts::U4;
-use heapless::Vec;
+use heapless::consts::{U4, U8};
 
 use cortex_m::asm::bkpt;
 use narc_hal::stm32l052::{TIM6 as TIM6_p};
@@ -27,9 +26,9 @@ use narc_hal::time::U32Ext;
 use narc_hal::timer;
 use narc_hal::timer::TimerExt;
 use embedded_hal::digital::OutputPin;
-use embedded_hal::timer::CountDown;
 use tw::TimerWheel;
 
+#[derive(Debug)]
 pub enum Functions {
     Callee,
 }
@@ -37,7 +36,7 @@ pub enum Functions {
 #[app(device = narc_hal::stm32l052)]
 const APP: () = {
     static mut LED: PA5<Output<PushPull>> = ();
-    static mut TW: TimerWheel<Functions> = ();
+    static mut TW: TimerWheel<Functions, U8, U4> = ();
     static mut STATE: bool = true;
     static mut TIM6: timer::Timer<TIM6_p> = ();
 
@@ -46,15 +45,15 @@ const APP: () = {
         let mut rcc = device.RCC.constrain();
         let mut flash = device.FLASH.constrain();
         let mut gpioa = device.GPIOA.split(&mut rcc.iop);
-        let mut led = gpioa.pa5.into_output(&mut gpioa.moder).push_pull(&mut gpioa.otyper);
+        let led = gpioa.pa5.into_output(&mut gpioa.moder).push_pull(&mut gpioa.otyper);
         let clocks = rcc.cfgr.freeze(&mut flash.acr);
         let mut tim = device.TIM6.timer(1.hz(), clocks, &mut rcc.apb1);
-        let mut timer_wheel = TimerWheel::new();
+        let mut timer_wheel = TimerWheel::<_, U8, U4>::new();
 
-        timer_wheel.schedule(0, Functions::Callee);
-        timer_wheel.schedule(2, Functions::Callee);
-        timer_wheel.schedule(4, Functions::Callee);
-        timer_wheel.schedule(6, Functions::Callee);
+        timer_wheel.schedule(0, Functions::Callee).unwrap();
+        timer_wheel.schedule(2, Functions::Callee).unwrap();
+        timer_wheel.schedule(4, Functions::Callee).unwrap();
+        timer_wheel.schedule(6, Functions::Callee).unwrap();
 
         tim.listen(timer::Event::TimeOut);
 

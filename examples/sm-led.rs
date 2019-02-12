@@ -14,6 +14,8 @@ use rtfm::export::wfi;
 use core::panic::PanicInfo;
 use core::sync::atomic::{self, Ordering};
 
+use rtfm::export::consts::{U10, U1};
+
 use cortex_m::asm::bkpt;
 use narc_hal::stm32l052::{TIM6 as TIM6_p};
 use narc_hal::rcc::RccExt;
@@ -28,7 +30,7 @@ use embedded_hal::PwmPin;
 use tw::TimerWheel;
 use sm::sm;
 
-type TwFunctions<'a> =&'a mut tw::TimerWheel<bool>;
+type TwFunctions<'a> =&'a mut tw::TimerWheel<bool, U10, U1>;
 type Led<'a> = &'a mut narc_hal::pwm::Pwm<narc_hal::stm32l052::TIM2, narc_hal::pwm::C1>;
 
 #[app(device = narc_hal::stm32l052)]
@@ -36,7 +38,7 @@ const APP: () = {
     static mut SM: Sm::Variant = ();
     static mut LED: narc_hal::pwm::Pwm<narc_hal::stm32l052::TIM2, narc_hal::pwm::C1> = ();
     static mut TIM6: timer::Timer<TIM6_p> = ();
-    static mut WT: TimerWheel<bool> = ();
+    static mut WT: TimerWheel<bool, U10, U1> = ();
 
     #[init]
     fn init() {
@@ -48,7 +50,7 @@ const APP: () = {
         let mut tim6 = device.TIM6.timer(1.hz(), clocks, &mut rcc.apb1);
         use Sm::*;
         let mut sm = Machine::new(Idle).as_enum();
-        let mut wt = TimerWheel::new();
+        let mut wt = TimerWheel::<_, U10, U1>::new();
 
         tim6.listen(timer::Event::TimeOut);
 
@@ -130,7 +132,7 @@ impl Sm::ValidEvent for Sm::Down {
         let max = led.get_max_duty();
         led.set_duty(max / 8);
         // TODO: 'fancy' error handling
-        let _ = wt.schedule(5, true);
+        let _ = wt.schedule(4, true);
     }
 }
 
@@ -142,7 +144,7 @@ impl Sm::ValidEvent for Sm::Up {
         let max = led.get_max_duty();
         led.set_duty(max / 1);
         // TODO: 'fancy' error handling
-        let _ = wt.schedule(5, true);
+        let _ = wt.schedule(4, true);
     }
 }
 

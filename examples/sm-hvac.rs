@@ -10,7 +10,7 @@ extern crate sm;
 extern crate timer_wheels as tw;
 
 use rtfm::app;
-use rtfm::export::wfi;
+use rtfm::export::{wfi, consts::U8, consts::U4};
 use core::panic::PanicInfo;
 use core::sync::atomic::{self, Ordering};
 
@@ -33,7 +33,7 @@ use sm::sm;
 
 type LedGreen<'a> = &'a mut PA5<Output<PushPull>>;
 type LedRed<'a> = &'a mut PA7<Output<PushPull>>;
-type TwFunctions<'a> =&'a mut rtfm::Exclusive<'a, tw::TimerWheel<Functions>>;
+type TwFunctions<'a> =&'a mut rtfm::Exclusive<'a, tw::TimerWheel<Functions, U8, U4>>;
 type U32 = u32;
 type BoolRTFM<'a> = &'a mut rtfm::Exclusive<'a, bool>;
 type Bool = bool;
@@ -57,7 +57,7 @@ const APP: () = {
     static mut T_REF: u32 = 2048;
     static mut TIM6: timer::Timer<TIM6_p> = ();
     static mut TIM2: timer::Timer<TIM2_p> = ();
-    static mut WT: TimerWheel<Functions> = ();
+    static mut WT: TimerWheel<Functions, U8, U4> = ();
     static mut ATLEAST6SEG: bool = false;
     static mut ATLEAST5SEG: bool = false;
 
@@ -77,7 +77,7 @@ const APP: () = {
         let adc_in = gpioa.pa2.into_analog(&mut gpioa.moder, &mut gpioa.pupdr);
         use Sm::*;
         let sm = Machine::new(Idle).as_enum();
-        let wt = TimerWheel::new();
+        let wt = TimerWheel::<_, U8, U4>::new();
 
         adc.config(adc_in, &mut rcc.apb2);
         tim6.listen(timer::Event::TimeOut);
@@ -177,12 +177,12 @@ const APP: () = {
             });
     }
 
-    #[task(resources = [ATLEAST6SEG])]
+    #[task(resources = [ATLEAST6SEG, ADC_VALUE])]
     fn after_6_seg() {
         resources.ATLEAST6SEG.lock(|var| *var = true);
     }
 
-    #[task(resources = [ATLEAST5SEG])]
+    #[task(resources = [ATLEAST5SEG, ADC_VALUE])]
     fn after_5_seg() {
         resources.ATLEAST5SEG.lock(|var| *var = true);
     }
@@ -225,7 +225,7 @@ impl Sm::ValidEvent for Sm::ToHeat {
         c.set_high();
         h.set_low();
         // TODO: 'fancy' error handling
-        let _ = wt.schedule(6, Functions::After6Seg);
+        let _ = wt.schedule(5, Functions::After6Seg);
     }
 }
 
@@ -250,7 +250,7 @@ impl Sm::ValidEvent for Sm::ToCool {
         c.set_low();
         h.set_high();
         // TODO: 'fancy' error handling
-        let _ = wt.schedule(5, Functions::After5Seg);
+        let _ = wt.schedule(4, Functions::After5Seg);
     }
 }
 
