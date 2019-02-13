@@ -177,12 +177,12 @@ const APP: () = {
             });
     }
 
-    #[task(resources = [ATLEAST6SEG, ADC_VALUE])]
+    #[task(resources = [ATLEAST6SEG])]
     fn after_6_seg() {
         resources.ATLEAST6SEG.lock(|var| *var = true);
     }
 
-    #[task(resources = [ATLEAST5SEG, ADC_VALUE])]
+    #[task(resources = [ATLEAST5SEG])]
     fn after_5_seg() {
         resources.ATLEAST5SEG.lock(|var| *var = true);
     }
