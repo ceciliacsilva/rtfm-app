@@ -30,22 +30,45 @@ use heapless::{
     spsc::{Consumer, Producer, Queue},
 };
 
-macro_rules! match_events {
-    (
-        $e:expr , $spawn:ident; [$(($x:ident, $task:ident)),*]
-    ) => {
-        match $e {
-            $( Event::$x => { $spawn.$task().unwrap(); } )*
-        }
-    };
+#[derive(Debug)]
+pub enum EventLed {
+    On,
+    Off,
 }
 
 #[derive(Debug)]
-pub enum Event {
-    SetLedOn,
-    SetLedOff,
-    WaitOneSecond,
+pub enum EventTime {
+    Delay,
 }
+
+pub trait IsEvent {
+    fn run(&self, spawn: idle::Spawn);
+}
+
+impl IsEvent for EventLed {
+    fn run(&self, spawn: idle::Spawn) {
+        match self {
+            EventLed::On => spawn.led_on().unwrap(),
+            EventLed::Off => spawn.led_off().unwrap(),
+        }
+    }
+}
+
+impl IsEvent for EventTime {
+    fn run(&self, spawn: idle::Spawn) {
+        match self {
+            EventTime::Delay => spawn.one_second().unwrap(),
+        }
+    }
+}
+
+type EventObject = &'static IsEvent;
+
+pub struct Event {
+    e: EventObject,
+}
+
+unsafe impl Send for Event {}
 
 #[app(device = narc_hal::stm32l052)]
 const APP: () = {
@@ -84,12 +107,7 @@ const APP: () = {
     fn idle() -> ! {
         loop {
             if let Some(event) = resources.C.dequeue(){
-                match_events!(event, spawn;
-                              [
-                                  (SetLedOn, led_on),
-                                  (SetLedOff, led_off),
-                                  (WaitOneSecond, one_second)
-                              ]);
+                event.e.run(spawn);
             }
             // wfi(); 
         }
@@ -97,20 +115,26 @@ const APP: () = {
 
     #[interrupt(resources = [P, EXTI])]
     fn EXTI4_15() {
-        resources.P.enqueue(Event::SetLedOn).unwrap();
+        resources.P.enqueue(Event{
+            e: &EventLed::On
+        });
         resources.EXTI.pr.modify(|_, w| w.pif0().bit(true));
     }
 
-    #[task(resources = [P, LED])]
+    #[task(resources = [P, LED], spawn = [one_second])]
     fn led_on() {
         resources.LED.set_high();
-        resources.P.enqueue(Event::WaitOneSecond).unwrap();
+        resources.P.enqueue(Event{
+            e: &EventTime::Delay
+        });
     }
 
     #[task(resources = [P, DELAY])]
     fn one_second() {
         resources.DELAY.delay_ms(1_000_u16);
-        resources.P.enqueue(Event::SetLedOff).unwrap();
+        resources.P.enqueue(Event{
+            e: &EventLed::Off
+        });
     }
 
     #[task(resources = [LED])]
