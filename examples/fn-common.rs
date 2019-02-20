@@ -48,7 +48,7 @@ pub trait IsEvent {
 impl IsEvent for EventLed {
     fn run(&self, spawn: idle::Spawn) {
         match self {
-            EventLed::On => spawn.led_on().unwrap(),
+            EventLed::On => spawn.led_on(true).unwrap(),
             EventLed::Off => spawn.led_off().unwrap(),
         }
     }
@@ -122,7 +122,7 @@ const APP: () = {
     }
 
     #[task(resources = [P, LED], spawn = [one_second])]
-    fn led_on() {
+    fn led_on(_msg: bool) {
         resources.LED.set_high();
         resources.P.enqueue(Event{
             e: &EventTime::Delay
