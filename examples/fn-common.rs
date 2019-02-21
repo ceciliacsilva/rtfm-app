@@ -32,13 +32,20 @@ use heapless::{
 
 #[derive(Debug)]
 pub enum EventLed {
-    On,
-    Off,
+    On(Led),
+    Off(Led),
+    Reset,
 }
 
 #[derive(Debug)]
 pub enum EventTime {
     Delay,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Led {
+    Azul,
+    Verde,
 }
 
 pub trait IsEvent {
@@ -48,8 +55,9 @@ pub trait IsEvent {
 impl IsEvent for EventLed {
     fn run(&self, spawn: idle::Spawn) {
         match self {
-            EventLed::On => spawn.led_on(true).unwrap(),
-            EventLed::Off => spawn.led_off().unwrap(),
+            EventLed::On(led) => spawn.led_on(led.clone()).unwrap(),
+            EventLed::Off(_led) => spawn.led_off().unwrap(),
+            EventLed::Reset => (),
         }
     }
 }
@@ -116,14 +124,16 @@ const APP: () = {
     #[interrupt(resources = [P, EXTI])]
     fn EXTI4_15() {
         resources.P.enqueue(Event{
-            e: &EventLed::On
+            e: &EventLed::On(Led::Verde),
         });
         resources.EXTI.pr.modify(|_, w| w.pif0().bit(true));
     }
 
     #[task(resources = [P, LED], spawn = [one_second])]
-    fn led_on(_msg: bool) {
-        resources.LED.set_high();
+    fn led_on(led: Led) {
+        if led == Led::Verde {
+            resources.LED.set_high();
+        }
         resources.P.enqueue(Event{
             e: &EventTime::Delay
         });
@@ -133,7 +143,7 @@ const APP: () = {
     fn one_second() {
         resources.DELAY.delay_ms(1_000_u16);
         resources.P.enqueue(Event{
-            e: &EventLed::Off
+            e: &EventLed::Off(Led::Verde),
         });
     }
 

@@ -6,68 +6,79 @@ extern crate cortex_m_rt;
 extern crate rtfm;
 extern crate narc_hal;
 extern crate embedded_hal;
-extern crate timer_wheels;
+extern crate sm;
+extern crate timer_wheels as tw;
 extern crate heapless;
 
 use rtfm::app;
-use rtfm::export::wfi;
+use rtfm::export::{wfi, consts::U10, consts::U8, consts::U1};
 use core::panic::PanicInfo;
 use core::sync::atomic::{self, Ordering};
 
-use cortex_m::asm::bkpt;
-
-use narc_hal::rcc::RccExt;
-use narc_hal::flash::FlashExt;
-use narc_hal::gpio::GpioExt;
-use narc_hal::gpio::{gpioa::PA5, Output, PushPull};
-use narc_hal::delay::Delay;
-
-use embedded_hal::digital::OutputPin;
-// use embedded_hal::blocking::delay::DelayMs;
-use embedded_hal::prelude::*;
 use heapless::{
     consts::*,
     spsc::{Consumer, Producer, Queue},
+    Vec,
 };
 
-#[derive(Debug)]
-pub enum EventLed {
-    On(Led),
-    Off(Led),
-    Reset,
-}
+use cortex_m::asm::bkpt;
+use narc_hal::stm32l052::{TIM6 as TIM6_p, TIM2 as TIM2_p, USART1 as USART1_p};
+use narc_hal::rcc::RccExt;
+use narc_hal::gpio::GpioExt;
+use narc_hal::flash::FlashExt;
+use narc_hal::gpio::{gpioa::PA5, Output, PushPull, gpioa::PA4, Input, PullUp, gpioa::PA6, gpioa::PA7};
+use narc_hal::time::U32Ext;
+use narc_hal::timer;
+use narc_hal::adc::AdcExt;
+use narc_hal::timer::TimerExt;
+use narc_hal::serial::{Serial, Rx, Event as UartEvent, Tx};
+
+use embedded_hal::prelude::*;
+use embedded_hal::digital::OutputPin;
+use embedded_hal::digital::InputPin;
+
+use cortex_m::peripheral::syst::SystClkSource;
+
+use tw::TimerWheel;
 
 #[derive(Debug)]
-pub enum EventTime {
-    Delay,
+pub enum LedAction {
+    On([Led; 2]),
+    Off(Vec<Led, U2>),
+    Reset(Led),
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Led {
-    Azul,
-    Verde,
+    Green,
+    Red,
+}
+
+#[derive(Debug)]
+pub enum Uart {
+    Decode,
 }
 
 pub trait IsEvent {
     fn run(&self, spawn: idle::Spawn);
 }
 
-impl IsEvent for EventLed {
+impl IsEvent for LedAction {
     fn run(&self, spawn: idle::Spawn) {
         match self {
-            EventLed::On(led) => spawn.led_on(led.clone()).unwrap(),
-            EventLed::Off(_led) => spawn.led_off().unwrap(),
-            EventLed::Reset => (),
-            _ => (),
+            LedAction::On(leds) => {
+                for led in leds {
+                    spawn.led_enable(led.clone()).unwrap();
+                }
+            },
+            _ => ()
         }
     }
 }
 
-impl IsEvent for EventTime {
+impl IsEvent for Uart {
     fn run(&self, spawn: idle::Spawn) {
-        match self {
-            EventTime::Delay => spawn.one_second().unwrap(),
-        }
+        
     }
 }
 
@@ -81,82 +92,180 @@ unsafe impl Send for Event {}
 
 #[app(device = narc_hal::stm32l052)]
 const APP: () = {
-    static mut EXTI: narc_hal::stm32l052::EXTI = ();
-    static mut Q: Option<Queue<Event, U4>> = None;
-    static mut P: Producer<'static, Event, U4> = ();
-    static mut C: Consumer<'static, Event, U4> = ();
-    static mut LED: PA5<Output<PushPull>> = ();
-    static mut DELAY: Delay = ();
+    static mut Q: Option<Queue<Event, U8>> = None;
+    static mut P: Producer<'static, Event, U8> = ();
+    static mut C: Consumer<'static, Event, U8> = ();
 
-    #[init(resources = [Q])]
+    static mut Q_UART: Option<Queue<u8, U8>> = None;
+    static mut P_UART: Producer<'static, u8, U8> = ();
+    static mut C_UART: Consumer<'static, u8, U8> = ();
+
+    static mut ADC: narc_hal::stm32l052::ADC = ();
+    static mut ADC_VALUE: u32 = 0;
+    static mut LED_GREEN: PA5<Output<PushPull>> = ();
+    static mut LED_RED: PA7<Output<PushPull>> = ();
+    static mut B1_COUNTER: u16 = 0;
+    static mut B2_COUNTER: u16 = 0;
+    static mut B1: PA4<Input<PullUp>> = ();
+    static mut B2: PA6<Input<PullUp>> = ();
+    static mut T_REF: u32 = 2048;
+    static mut TIM6: timer::Timer<TIM6_p> = ();
+    static mut TIM2: timer::Timer<TIM2_p> = ();
+    static mut RX: Rx<USART1_p> = ();
+    static mut TX: Tx<USART1_p> = ();
+
+    static mut WT: TimerWheel<bool, U10, U1> = ();
+
+    static mut TIMER_COUNTER: usize = 1;
+
+    static mut VEC: Vec<Led, U2> = Vec::<_, U2>::new();
+
+    #[init(resources = [Q, Q_UART])]
     fn init() {
         let mut rcc = device.RCC.constrain();
-        let mut flash = device.FLASH.constrain();
         let mut gpioa = device.GPIOA.split(&mut rcc.iop);
+        let mut flash = device.FLASH.constrain();
+        let led_green = gpioa.pa5.into_output(&mut gpioa.moder).push_pull(&mut gpioa.otyper);
+        let led_red = gpioa.pa7.into_output(&mut gpioa.moder).push_pull(&mut gpioa.otyper);
+        let mut adc: narc_hal::stm32l052::ADC = device.ADC;
         let clocks = rcc.cfgr.freeze(&mut flash.acr);
-        let led = gpioa.pa5.into_output(&mut gpioa.moder).push_pull(&mut gpioa.otyper);
-        let _but = gpioa.pa4.into_input(&mut gpioa.moder).pull_up(&mut gpioa.pupdr);
-        let delay = Delay::new(core.SYST, clocks);
+        let mut tim6 = device.TIM6.timer(200.hz(), clocks, &mut rcc.apb1);
+        let mut tim2 = device.TIM2.timer(1.hz(), clocks, &mut rcc.apb1);
+        let b1 = gpioa.pa4.into_input(&mut gpioa.moder).pull_up(&mut gpioa.pupdr);
+        let b2 = gpioa.pa6.into_input(&mut gpioa.moder).pull_up(&mut gpioa.pupdr);
+        let adc_in = gpioa.pa2.into_analog(&mut gpioa.moder, &mut gpioa.pupdr);
+        let wt = TimerWheel::<_, U10, U1>::new();
 
-        device.SYSCFG_COMP.exticr2.modify(|_, w| unsafe{ w.exti4().bits(0b0000) });//PA0
-        device.EXTI.imr.modify(|_, w| w.im4().bit(true));
-        device.EXTI.ftsr.modify(|_, w| w.ft4().bit(true));
+        let tx = gpioa.pa9.into_alternate(&mut gpioa.moder).af4(&mut gpioa.afrh);
+        let rx = gpioa.pa10.into_alternate(&mut gpioa.moder).af4(&mut gpioa.afrh);
+
+        let serial = Serial::usart1(
+            device.USART1,
+            (tx, rx),
+            9_600.bps(),
+            clocks,
+            &mut rcc.apb2,
+            None
+        );
+
+        serial.listen(UartEvent::Rxne);
 
         *resources.Q = Some(Queue::new());
         let (p, c) = resources.Q.as_mut().unwrap().split();
 
-        EXTI = device.EXTI;
+        *resources.Q_UART = Some(Queue::new());
+        let (p_uart, c_uart) = resources.Q_UART.as_mut().unwrap().split();
+
+        adc.config(adc_in, &mut rcc.apb2);
+        tim6.listen(timer::Event::TimeOut);
+        tim2.listen(timer::Event::TimeOut);
+
+        core.SYST.set_clock_source(SystClkSource::Core);
+        core.SYST.set_reload(2_000_000); // 1s
+        core.SYST.clear_current();
+        core.SYST.enable_counter();
+        core.SYST.enable_interrupt();
+
+        let (tx, rx, _ri) = serial.split();
+
+        ADC = adc;
+        LED_GREEN = led_green;
+        LED_RED = led_red;
+        B1 = b1;
+        B2 = b2;
+        TIM6 = tim6;
+        TIM2 = tim2;
+        WT = wt;
+
         P = p;
         C = c;
-        LED = led;
-        DELAY = delay;
+
+        P_UART = p_uart;
+        C_UART = c_uart;
+        RX = rx;
+        TX = tx;
     }
 
-    #[idle(resources = [C], spawn = [led_on, led_off, one_second])]
+    #[idle(spawn = [led_enable])]
     fn idle() -> ! {
         loop {
-            if let Some(event) = resources.C.dequeue(){
-                event.e.run(spawn);
+            wfi();
+
+            // TODO dequeue of events items.
+        }
+    }
+
+    #[exception(resources = [WT])]
+    fn SysTick() {
+        let mut has_func = false;
+        {
+            let to_run = resources.WT.tick();
+            while let Some(_) = to_run.pop() {
+                has_func = true;
             }
-            // wfi(); 
+        }
+
+        if has_func {
+            // TODO enqueue disable led
         }
     }
 
-    #[interrupt(resources = [P, EXTI])]
-    fn EXTI4_15() {
-        resources.P.enqueue(Event{
-            e: &EventLed::On(Led::Verde),
-        });
-        resources.EXTI.pr.modify(|_, w| w.pif0().bit(true));
-    }
+    #[interrupt(resources = [P, TIM6, B1_COUNTER, B1, B2_COUNTER, B2, VEC])]
+    fn TIM6_DAC() {
+        resources.TIM6.clear_it();
 
-    #[task(resources = [P, LED], spawn = [one_second])]
-    fn led_on(led: Led) {
-        if led == Led::Verde {
-            resources.LED.set_high();
+        let b1: u16 = if resources.B1.is_high() { 1 } else { 0 };
+        *resources.B1_COUNTER = (*resources.B1_COUNTER << 1) | b1 | 0xe000;
+        let b2: u16 = if resources.B2.is_high() { 1 } else { 0 };
+        *resources.B2_COUNTER = (*resources.B2_COUNTER << 1) | b2 | 0xe000;
+
+        if *resources.B1_COUNTER == 0xf000 {
+            // TODO enqueue enable led
+
+            resources.P.enqueue(
+                Event {
+                    // e: &LedAction::On(resources.VEC),
+                    e: &LedAction::On([Led::Green, Led::Red]),
+                }
+            );
         }
-        resources.P.enqueue(Event{
-            e: &EventTime::Delay
-        });
+
+        if *resources.B2_COUNTER == 0xf000 {
+            // TODO enqueue toggle state in 1 second
+        }
     }
 
-    #[task(resources = [P, DELAY])]
-    fn one_second() {
-        resources.DELAY.delay_ms(1_000_u16);
-        resources.P.enqueue(Event{
-            e: &EventLed::Off(Led::Verde),
-        });
+    #[interrupt(resources = [P, TIMER_COUNTER, P_UART, RX])]
+    fn USART1() {
+        let data = resources.RX.read().unwrap();
+        resources.P_UART.enqueue(data).unwrap();
+        let _ = resources.P.enqueue(
+            Event {
+                e: &Uart::Decode,
+            }
+        );
     }
 
-    #[task(resources = [LED])]
-    fn led_off() {
-        resources.LED.set_low();
+    /// Capacity > 1
+    #[task(resources = [WT, TIMER_COUNTER, LED_GREEN, LED_RED], capacity = 2)]
+    fn led_enable(led: Led) {
+        if led == Led::Green {
+            resources.LED_GREEN.set_high();
+        }
+        if led == Led::Red {
+            resources.LED_RED.set_high();
+        }
+
+        let timer_high = resources.TIMER_COUNTER.lock(|t| *t);
+        let _ = resources.WT.schedule(timer_high, true);
     }
+
     extern "C" {
-        fn SPI1();
+        fn SPI1 ();
     }
 
 };
+
 
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
