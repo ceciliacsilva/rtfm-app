@@ -26,12 +26,13 @@ use narc_hal::stm32l052::{TIM6 as TIM6_p, TIM2 as TIM2_p, USART1 as USART1_p};
 use narc_hal::rcc::RccExt;
 use narc_hal::gpio::GpioExt;
 use narc_hal::flash::FlashExt;
-use narc_hal::gpio::{gpioa::PA5, Output, PushPull, gpioa::PA4, Input, PullUp, gpioa::PA6, gpioa::PA7};
+use narc_hal::gpio::{gpioa::PA3, Output, PushPull, gpioa::PA4, Input, PullUp, gpioa::PA6, gpioa::PA7};
 use narc_hal::time::U32Ext;
 use narc_hal::timer;
 use narc_hal::adc::AdcExt;
 use narc_hal::timer::TimerExt;
 use narc_hal::serial::{Serial, Rx, Event as UartEvent, Tx};
+use narc_hal::pwm::PwmExt;
 
 use embedded_hal::prelude::*;
 use embedded_hal::digital::OutputPin;
@@ -44,14 +45,15 @@ use tw::TimerWheel;
 #[derive(Debug)]
 pub enum LedAction {
     On([Led; 2]),
-    Off(Vec<Led, U2>),
-    Reset(Led),
+    Off([Led; 2]),
+    ChangeDuty(u16),
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Led {
-    Green,
+    Yellow,
     Red,
+    Green,
 }
 
 #[derive(Debug)]
@@ -71,7 +73,13 @@ impl IsEvent for LedAction {
                     spawn.led_enable(led.clone()).unwrap();
                 }
             },
-            _ => ()
+            LedAction::Off(leds) => {
+                for led in leds {
+                    spawn.led_disable(led.clone()).unwrap();
+                }
+            },
+            LedAction::ChangeDuty(duty) if *duty <= 100 => spawn.led_duty(*duty).unwrap(),
+            _ => (),
         }
     }
 }
@@ -90,6 +98,8 @@ pub struct Event {
 
 unsafe impl Send for Event {}
 
+const END_FRAME: u8 = 10;
+
 #[app(device = narc_hal::stm32l052)]
 const APP: () = {
     static mut Q: Option<Queue<Event, U8>> = None;
@@ -102,15 +112,14 @@ const APP: () = {
 
     static mut ADC: narc_hal::stm32l052::ADC = ();
     static mut ADC_VALUE: u32 = 0;
-    static mut LED_GREEN: PA5<Output<PushPull>> = ();
+    static mut LED_GREEN: narc_hal::pwm::Pwm<narc_hal::stm32l052::TIM2, narc_hal::pwm::C1> = ();
     static mut LED_RED: PA7<Output<PushPull>> = ();
+    static mut LED_YELLOW: PA3<Output<PushPull>> = ();
     static mut B1_COUNTER: u16 = 0;
     static mut B2_COUNTER: u16 = 0;
     static mut B1: PA4<Input<PullUp>> = ();
     static mut B2: PA6<Input<PullUp>> = ();
-    static mut T_REF: u32 = 2048;
     static mut TIM6: timer::Timer<TIM6_p> = ();
-    static mut TIM2: timer::Timer<TIM2_p> = ();
     static mut RX: Rx<USART1_p> = ();
     static mut TX: Tx<USART1_p> = ();
 
@@ -125,12 +134,12 @@ const APP: () = {
         let mut rcc = device.RCC.constrain();
         let mut gpioa = device.GPIOA.split(&mut rcc.iop);
         let mut flash = device.FLASH.constrain();
-        let led_green = gpioa.pa5.into_output(&mut gpioa.moder).push_pull(&mut gpioa.otyper);
+        let led_green = gpioa.pa5.into_alternate(&mut gpioa.moder).af5(&mut gpioa.afrl);
         let led_red = gpioa.pa7.into_output(&mut gpioa.moder).push_pull(&mut gpioa.otyper);
+        let led_yellow = gpioa.pa3.into_output(&mut gpioa.moder).push_pull(&mut gpioa.otyper);
         let mut adc: narc_hal::stm32l052::ADC = device.ADC;
         let clocks = rcc.cfgr.freeze(&mut flash.acr);
         let mut tim6 = device.TIM6.timer(200.hz(), clocks, &mut rcc.apb1);
-        let mut tim2 = device.TIM2.timer(1.hz(), clocks, &mut rcc.apb1);
         let b1 = gpioa.pa4.into_input(&mut gpioa.moder).pull_up(&mut gpioa.pupdr);
         let b2 = gpioa.pa6.into_input(&mut gpioa.moder).pull_up(&mut gpioa.pupdr);
         let adc_in = gpioa.pa2.into_analog(&mut gpioa.moder, &mut gpioa.pupdr);
@@ -158,7 +167,6 @@ const APP: () = {
 
         adc.config(adc_in, &mut rcc.apb2);
         tim6.listen(timer::Event::TimeOut);
-        tim2.listen(timer::Event::TimeOut);
 
         core.SYST.set_clock_source(SystClkSource::Core);
         core.SYST.set_reload(2_000_000); // 1s
@@ -168,13 +176,22 @@ const APP: () = {
 
         let (tx, rx, _ri) = serial.split();
 
+        let mut led_green = device.TIM2
+            .pwm(
+                led_green,
+                50.hz(),
+                clocks,
+                &mut rcc.apb1,
+            );
+        led_green.enable();
+
         ADC = adc;
         LED_GREEN = led_green;
         LED_RED = led_red;
+        LED_YELLOW = led_yellow;
         B1 = b1;
         B2 = b2;
         TIM6 = tim6;
-        TIM2 = tim2;
         WT = wt;
 
         P = p;
@@ -186,16 +203,19 @@ const APP: () = {
         TX = tx;
     }
 
-    #[idle(spawn = [led_enable])]
+    #[idle(resources = [C], spawn = [led_enable, led_disable, led_duty])]
     fn idle() -> ! {
         loop {
-            wfi();
+            // wfi();
 
-            // TODO dequeue of events items.
+            // DONE dequeue of events items.
+            if let Some(item) = resources.C.dequeue() {
+                item.e.run(spawn);
+            }
         }
     }
 
-    #[exception(resources = [WT])]
+    #[exception(resources = [P, WT])]
     fn SysTick() {
         let mut has_func = false;
         {
@@ -206,7 +226,12 @@ const APP: () = {
         }
 
         if has_func {
-            // TODO enqueue disable led
+            // DONE enqueue disable led
+            resources.P.enqueue(
+                Event {
+                    e: &LedAction::Off([Led::Yellow, Led::Red]),
+                }
+            );
         }
     }
 
@@ -220,37 +245,44 @@ const APP: () = {
         *resources.B2_COUNTER = (*resources.B2_COUNTER << 1) | b2 | 0xe000;
 
         if *resources.B1_COUNTER == 0xf000 {
-            // TODO enqueue enable led
+            // DONE enqueue enable led
 
             resources.P.enqueue(
                 Event {
-                    // e: &LedAction::On(resources.VEC),
-                    e: &LedAction::On([Led::Green, Led::Red]),
+                    e: &LedAction::On([Led::Yellow, Led::Red]),
                 }
             );
         }
 
         if *resources.B2_COUNTER == 0xf000 {
-            // TODO enqueue toggle state in 1 second
+            // DONE enqueue change duty
+            resources.P.enqueue(
+                Event {
+                    e: &LedAction::ChangeDuty(50),
+                }
+            );
         }
     }
 
     #[interrupt(resources = [P, TIMER_COUNTER, P_UART, RX])]
     fn USART1() {
         let data = resources.RX.read().unwrap();
+        //CR - end of frame
+        if data == END_FRAME {
+            let _ = resources.P.enqueue(
+                Event {
+                    e: &Uart::Decode,
+                }
+            );
+        }
         resources.P_UART.enqueue(data).unwrap();
-        let _ = resources.P.enqueue(
-            Event {
-                e: &Uart::Decode,
-            }
-        );
     }
 
     /// Capacity > 1
-    #[task(resources = [WT, TIMER_COUNTER, LED_GREEN, LED_RED], capacity = 2)]
+    #[task(resources = [WT, TIMER_COUNTER, LED_YELLOW, LED_RED], capacity = 2)]
     fn led_enable(led: Led) {
-        if led == Led::Green {
-            resources.LED_GREEN.set_high();
+        if led == Led::Yellow {
+            resources.LED_YELLOW.set_high();
         }
         if led == Led::Red {
             resources.LED_RED.set_high();
@@ -258,6 +290,38 @@ const APP: () = {
 
         let timer_high = resources.TIMER_COUNTER.lock(|t| *t);
         let _ = resources.WT.schedule(timer_high, true);
+    }
+
+    #[task(resources = [LED_YELLOW, LED_RED])]
+    fn led_disable(led: Led) {
+        if led == Led::Yellow {
+            resources.LED_YELLOW.set_low();
+        }
+        if led == Led::Red {
+            resources.LED_RED.set_low();
+        }
+    }
+
+    #[task(resources = [LED_GREEN])]
+    fn led_duty(duty_percent: u16){
+        let max = resources.LED_GREEN.get_max_duty();
+        let duty = (duty_percent * max) / 100;
+        resources.LED_GREEN.set_duty(duty);
+    }
+
+    #[task(resources = [P, C_UART, TIMER_COUNTER])]
+    fn uart_decode() {
+        let mut vec = Vec::<u8, U3>::new();
+        while let Some(c) = resources.C_UART.dequeue() {
+            if c == END_FRAME {
+                break;
+            }
+            vec.push(c);
+        }
+        match &vec[..]{
+            [b'v', nh, nl] => resources.TIMER_COUNTER.lock(|t| *t = ( (nh << 8) + nl )),
+            _ => ()
+        };
     }
 
     extern "C" {
