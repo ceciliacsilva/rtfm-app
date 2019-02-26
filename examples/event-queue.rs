@@ -9,6 +9,8 @@ extern crate embedded_hal;
 extern crate sm;
 extern crate timer_wheels as tw;
 extern crate heapless;
+#[macro_use(block)]
+extern crate nb;
 
 use rtfm::app;
 use rtfm::export::{wfi, consts::U10, consts::U8, consts::U1};
@@ -42,27 +44,15 @@ use cortex_m::peripheral::syst::SystClkSource;
 
 use tw::TimerWheel;
 
+pub trait IsEvent {
+    fn run(&self, spawn: idle::Spawn);
+}
+
 #[derive(Debug)]
 pub enum LedAction {
     On([Led; 2]),
     Off([Led; 2]),
-    ChangeDuty(u16),
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum Led {
-    Yellow,
-    Red,
-    Green,
-}
-
-#[derive(Debug)]
-pub enum Uart {
-    Decode,
-}
-
-pub trait IsEvent {
-    fn run(&self, spawn: idle::Spawn);
+    ChangeDuty,
 }
 
 impl IsEvent for LedAction {
@@ -78,15 +68,45 @@ impl IsEvent for LedAction {
                     spawn.led_disable(led.clone()).unwrap();
                 }
             },
-            LedAction::ChangeDuty(duty) if *duty <= 100 => spawn.led_duty(*duty).unwrap(),
-            _ => (),
+            LedAction::ChangeDuty => spawn.led_duty().unwrap(),
         }
     }
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub enum Led {
+    Yellow,
+    Red,
+    Green,
+}
+
+#[derive(Debug)]
+pub enum Uart {
+    Decode,
+    SendADC,
+}
+
 impl IsEvent for Uart {
     fn run(&self, spawn: idle::Spawn) {
-        
+        match self {
+            Uart::Decode => spawn.uart_decode().unwrap(),
+            Uart::SendADC => {
+                spawn.uart_send_adc().unwrap();
+            },
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum Adc {
+    Read,
+}
+
+impl IsEvent for Adc {
+    fn run(&self, spawn: idle::Spawn) {
+        match self {
+            Adc::Read => spawn.adc_read().unwrap(),
+        }
     }
 }
 
@@ -112,6 +132,7 @@ const APP: () = {
 
     static mut ADC: narc_hal::stm32l052::ADC = ();
     static mut ADC_VALUE: u32 = 0;
+    static mut DUTY: u16 = 0;
     static mut LED_GREEN: narc_hal::pwm::Pwm<narc_hal::stm32l052::TIM2, narc_hal::pwm::C1> = ();
     static mut LED_RED: PA7<Output<PushPull>> = ();
     static mut LED_YELLOW: PA3<Output<PushPull>> = ();
@@ -203,7 +224,7 @@ const APP: () = {
         TX = tx;
     }
 
-    #[idle(resources = [C], spawn = [led_enable, led_disable, led_duty])]
+    #[idle(resources = [C], spawn = [led_enable, led_disable, led_duty, uart_decode, uart_send_adc, adc_read])]
     fn idle() -> ! {
         loop {
             // wfi();
@@ -258,7 +279,7 @@ const APP: () = {
             // DONE enqueue change duty
             resources.P.enqueue(
                 Event {
-                    e: &LedAction::ChangeDuty(50),
+                    e: &Adc::Read,
                 }
             );
         }
@@ -302,11 +323,12 @@ const APP: () = {
         }
     }
 
-    #[task(resources = [LED_GREEN])]
-    fn led_duty(duty_percent: u16){
+    #[task(resources = [LED_GREEN, DUTY])]
+    fn led_duty(){
+        let duty_percent = *resources.DUTY as u32;
         let max = resources.LED_GREEN.get_max_duty();
-        let duty = (duty_percent * max) / 100;
-        resources.LED_GREEN.set_duty(duty);
+        let duty = ((duty_percent * max as u32) / 100) as u16;
+        resources.LED_GREEN.set_duty(max);
     }
 
     #[task(resources = [P, C_UART, TIMER_COUNTER])]
@@ -316,12 +338,58 @@ const APP: () = {
             if c == END_FRAME {
                 break;
             }
-            vec.push(c);
+            vec.push((c));
         }
         match &vec[..]{
-            [b'v', nh, nl] => resources.TIMER_COUNTER.lock(|t| *t = ( (nh << 8) + nl )),
-            _ => ()
+            [b'v', nh] => {
+                resources.TIMER_COUNTER.lock(|t| *t = (*nh - 48) as usize);
+            },
+            [b'r'] => //DONE read adc
+            {
+                let _ = resources.P.enqueue(
+                    Event {
+                        e: &Adc::Read,
+                    }
+                );
+            },
+            _ => (),
         };
+    }
+
+    #[task(resources = [TX, ADC_VALUE])]
+    fn uart_send_adc() {
+        let value = *resources.ADC_VALUE;
+
+        // memory transmute (unsafe) is an option here.
+        let b3 : u8 = ((value >> 8) & 0xff) as u8;
+        let b4 : u8 = (value & 0xff) as u8;
+
+        block!(resources.TX.write(b3)).ok();
+        block!(resources.TX.write(b4)).ok();
+        block!(resources.TX.write(END_FRAME)).ok();
+    }
+
+    #[task(resources = [P, ADC, ADC_VALUE, DUTY])]
+    fn adc_read() {
+        let value = resources.ADC.read();
+
+        *resources.ADC_VALUE = value;
+        resources.P.enqueue(
+            Event {
+                e: &Uart::SendADC,
+            }
+        );
+
+
+        let duty = (value * 100) / 4095;
+        *resources.DUTY = duty as u16;
+
+        resources.P.enqueue(
+            Event {
+                e: &LedAction::ChangeDuty,
+            }
+        );
+
     }
 
     extern "C" {
